@@ -6,6 +6,7 @@ import { effectKey, sourceEventKey, classifyFailure, nextBackoffMs, retryAfterMs
 import { scoreLead, bandFor, detectConflict } from './scoring.mjs';
 import { assess, jaroWinkler, tierFor, CIRCUMSTANTIAL_WEIGHTS } from './dedup.mjs';
 import { toCanonical, validate } from './validate.mjs';
+import { parseCsv } from './csv.mjs';
 import { ulid, canonicalJson, sha256 } from './ids.mjs';
 
 // ---------------------------------------------------------------- edge case 2
@@ -312,4 +313,49 @@ test('denied consent is recorded and permits no channel', () => {
   assert.equal(lead.consent_status, 'denied');
   assert.deepEqual(lead.channels_allowed, []);
   assert.equal(validate(lead).ok, true, 'refusing marketing is not a data quality problem');
+});
+
+// --------------------------------------------------------------- edge case 13
+test('a corrupted row does not take down the rest of the batch', () => {
+  const csv = [
+    'name,email,phone,service',
+    'Amara Okafor,amara@northwind-industrial.com,0501234567,implementation',
+    'Broken Row,missing-columns',
+    'Yuki Tanaka,yuki@tanaka-mfg.co.jp,+818012345678,consulting',
+    'Quoted Fine,"quoted@lumen-health.io","+44 7700 900123",training',
+    'Bad Quote,we"ird@example.com,+971501112222,support',
+  ].join('\n');
+
+  const { header, rows } = parseCsv(csv);
+  assert.deepEqual(header, ['name', 'email', 'phone', 'service']);
+  assert.equal(rows.length, 5);
+
+  const good = rows.filter((r) => r.ok);
+  const bad = rows.filter((r) => !r.ok);
+  assert.equal(good.length, 3, 'three valid rows must survive');
+  assert.equal(bad.length, 2);
+
+  assert.equal(bad[0].line, 3);
+  assert.equal(bad[0].error, 'column_count_mismatch');
+  assert.match(bad[0].detail, /expected 4 columns, found 2/);
+  assert.equal(bad[1].error, 'malformed_quoting');
+
+  // The bad rows keep their original text so a human can fix and resubmit them.
+  assert.ok(bad.every((r) => typeof r.raw === 'string' && r.raw.length > 0));
+  assert.equal(good[1].values.email, 'yuki@tanaka-mfg.co.jp');
+});
+
+test('quoted fields carrying commas, newlines and escaped quotes survive intact', () => {
+  const csv = 'name,notes\n"Okafor, Amara","He said ""yes"" on the call\nand asked for a quote"\n';
+  const { rows } = parseCsv(csv);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].ok, true);
+  assert.equal(rows[0].values.name, 'Okafor, Amara');
+  assert.match(rows[0].values.notes, /said "yes" on the call/);
+  assert.match(rows[0].values.notes, /\n/);
+});
+
+test('an unterminated quote is reported rather than swallowing the file', () => {
+  const { rows } = parseCsv('name,notes\nA,"never closed\nB,fine\n');
+  assert.ok(rows.some((r) => !r.ok && r.error === 'malformed_quoting'));
 });

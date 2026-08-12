@@ -177,6 +177,10 @@ CREATE TABLE dead_letter (
 
 CREATE INDEX dlq_open_idx ON dead_letter (failed_at DESC) WHERE resolution = 'open';
 
+-- The dead letter queue is a human work list, so re-submitting the same broken
+-- input must not pile up identical entries for someone to wade through.
+CREATE UNIQUE INDEX dlq_idem_idx ON dead_letter (idempotency_key) WHERE idempotency_key IS NOT NULL;
+
 CREATE TABLE duplicate_decision (
   id                bigserial PRIMARY KEY,
   lead_id           text NOT NULL REFERENCES lead(lead_id),

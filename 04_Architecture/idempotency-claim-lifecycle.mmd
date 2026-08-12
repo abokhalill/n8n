@@ -1,0 +1,57 @@
+%% Outbound effect lifecycle — the claim/commit/reconcile protocol.
+%% This is the mechanism behind edge cases 7, 8, 11 and 14.
+stateDiagram-v2
+    direction TB
+
+    [*] --> Deriving
+
+    Deriving: Derive key from stable inputs only
+    note right of Deriving
+      v1:{domain}:{entity}:{id}:{occurrence}
+      Never $execution.id, never a timestamp,
+      never an attempt counter. Purity here is
+      what makes replay (case 14) free.
+    end note
+
+    Deriving --> Claiming
+
+    Claiming: INSERT ON CONFLICT DO NOTHING RETURNING
+    Claiming --> Owned: row returned — we own the effect
+    Claiming --> Observed: zero rows — someone got here first
+
+    Owned --> Calling
+    Calling: external provider call
+
+    Calling --> Succeeded: 2xx
+    Calling --> Retryable: 429 / 408 / 5xx / timeout
+    Calling --> Terminal: other 4xx / missing credentials
+    Calling --> Ambiguous: process died before settling
+
+    Retryable --> Backoff
+    Backoff: requeue at random(0, min(2s*2^n, 15m))
+    Backoff --> Claiming: attempt < 5
+    Backoff --> Terminal: attempts exhausted
+
+    Observed --> Succeeded: stored state = succeeded, reuse response
+    Observed --> Terminal: stored state = failed_permanent
+    Observed --> Backoff: in_flight and fresh — another worker owns it
+    Observed --> Ambiguous: in_flight and stale
+
+    Ambiguous: Did the effect land? Lost ack — case 7
+    Ambiguous --> Reconciling
+    Reconciling: ask the provider — lookup by idempotency key
+    Reconciling --> Succeeded: found, adopt provider_ref
+    Reconciling --> Backoff: not found, safe to retry
+
+    Terminal --> DeadLetter
+    DeadLetter: dead_letter row keeps the original key
+    DeadLetter --> Claiming: operator replay re-derives the SAME key
+
+    Succeeded --> [*]
+
+    note left of Succeeded
+      Idempotent by construction: every later
+      attempt lands in Observed and short-circuits.
+      Case 8 (WhatsApp retry) proven externally by
+      asserting the mock journal saw exactly one send.
+    end note

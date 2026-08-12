@@ -183,7 +183,7 @@ CREATE TABLE duplicate_decision (
   candidate_lead_id text NOT NULL REFERENCES lead(lead_id),
   confidence        numeric(4,3) NOT NULL,
   -- full feature vector retained so thresholds can be fitted from outcomes later
-  -- rather than argued about (see DECISIONS.md D-011)
+  -- rather than argued about
   features          jsonb NOT NULL,
   tier              text NOT NULL CHECK (tier IN ('auto_merge','review','distinct')),
   action_taken      text NOT NULL,

@@ -18,7 +18,7 @@ const END = '/* __END_LEADOPS_LIB__ */';
 
 // Dependency order. Everything is flattened into one scope, so a file may only
 // reference names defined above it.
-const LIB_FILES = ['hash.mjs', 'ids.mjs', 'normalize.mjs', 'idempotency.mjs', 'csv.mjs', 'validate.mjs', 'scoring.mjs', 'dedup.mjs', 'routing.mjs'];
+const LIB_FILES = ['hash.mjs', 'ids.mjs', 'normalize.mjs', 'idempotency.mjs', 'csv.mjs', 'validate.mjs', 'scoring.mjs', 'dedup.mjs', 'routing.mjs', 'odoo.mjs'];
 
 function bundle() {
   const parts = LIB_FILES.map((file) => {

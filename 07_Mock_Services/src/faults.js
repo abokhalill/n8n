@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 
 const armed = new Map();
 
-const MODES = new Set(['timeout', 'slow', 'status', 'reset', 'malformed', 'empty', 'respond']);
+const MODES = new Set(['timeout', 'slow', 'status', 'reset', 'malformed', 'empty', 'respond', 'drop_response']);
 
 export function arm(spec) {
   if (!MODES.has(spec.mode)) {
@@ -91,6 +91,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // to the real handler (which is what 'slow' wants — it delays a success, not a failure).
 export async function apply(fault, _req, res) {
   switch (fault.mode) {
+    case 'drop_response': {
+      // The effect lands, the acknowledgement does not. This is the only honest way
+      // to reproduce edge case 7: the handler runs and mutates state, then the
+      // socket dies before the client learns anything. Distinct from 'timeout',
+      // which never reaches the handler at all.
+      const kill = () => { try { res.socket?.destroy(); } catch { /* already gone */ } };
+      res.json = function () { if (res.locals.journal) res.locals.journal.outcome ??= 'delivered'; kill(); return res; };
+      res.send = function () { kill(); return res; };
+      return false;
+    }
+
     case 'reset':
       // Socket death rather than an HTTP status: this is the "service is down"
       // error class, ECONNRESET, which travels a different code path than a 503.

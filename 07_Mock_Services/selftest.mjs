@@ -172,6 +172,23 @@ async function main() {
   check('inline directive affects exactly one request',
     inline.status === 500 && afterInline.status === 200);
 
+  // ---- Fault: effect lands, acknowledgement lost (edge case 7) ------------
+  await armFault({ id: 'fdrop', provider: 'odoo', route: 'POST /odoo/leads', mode: 'drop_response', times: 1 });
+  const DROPKEY = 'v1:odoo.lead.create:lead:01DROPTEST:1';
+  let clientSaw = 'a response';
+  try {
+    await fetch(`${BASE}/odoo/leads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': DROPKEY },
+      body: JSON.stringify({ name: 'Ghost Record' }),
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch { clientSaw = 'nothing'; }
+  const ghost = await j(`/odoo/leads/lookup?idempotency_key=${encodeURIComponent(DROPKEY)}`);
+  check('drop_response loses the acknowledgement but keeps the effect',
+    clientSaw === 'nothing' && ghost.status === 200 && ghost.body.found === true,
+    `client saw ${clientSaw}`);
+
   // ---- Duplicate webhook delivery (edge case 11) --------------------------
   // No n8n in this self-test, so delivery fails at the transport. What is being
   // checked is that the emitter attempts the *same* payload twice.

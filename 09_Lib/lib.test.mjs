@@ -7,6 +7,7 @@ import { scoreLead, bandFor, detectConflict } from './scoring.mjs';
 import { assess, jaroWinkler, tierFor, CIRCUMSTANTIAL_WEIGHTS } from './dedup.mjs';
 import { toCanonical, validate } from './validate.mjs';
 import { parseCsv } from './csv.mjs';
+import { route, assignRep } from './routing.mjs';
 import { ulid, canonicalJson, sha256 } from './ids.mjs';
 
 // ---------------------------------------------------------------- edge case 2
@@ -358,4 +359,102 @@ test('quoted fields carrying commas, newlines and escaped quotes survive intact'
 test('an unterminated quote is reported rather than swallowing the file', () => {
   const { rows } = parseCsv('name,notes\nA,"never closed\nB,fine\n');
   assert.ok(rows.some((r) => !r.ok && r.error === 'malformed_quoting'));
+});
+
+// ------------------------------------------------------------ routing and holds
+const REPS = [
+  { rep_id: 'rep_amara', service_categories: ['consulting', 'implementation'], regions: ['EMEA', 'MEA'], capacity: 10, open_leads: 2, available: true },
+  { rep_id: 'rep_yuki',  service_categories: ['implementation', 'support'],    regions: ['APAC'],        capacity: 10, open_leads: 9, available: true },
+  { rep_id: 'rep_luis',  service_categories: ['consulting', 'training'],       regions: ['EMEA', 'AMER'], capacity: 8, open_leads: 3, available: true },
+  { rep_id: 'rep_hana',  service_categories: ['consulting'],                   regions: ['MEA'],          capacity: 6, open_leads: 6, available: false },
+];
+
+test('assignment prefers category and region, then falls back a rung at a time', () => {
+  const emea = assignRep({ lead: { service_interest: 'implementation', region: 'EMEA' }, reps: REPS });
+  assert.equal(emea.rep_id, 'rep_amara');
+  assert.equal(emea.fallback_level, 'category_and_region');
+
+  // Nobody covers training in APAC, so the category rung wins over the region rung.
+  const apacTraining = assignRep({ lead: { service_interest: 'training', region: 'APAC' }, reps: REPS });
+  assert.equal(apacTraining.rep_id, 'rep_luis');
+  assert.equal(apacTraining.fallback_level, 'category_only');
+});
+
+test('an unavailable rep is never assigned, however good the match', () => {
+  // rep_hana is the only MEA consulting rep, and is unavailable and at capacity.
+  const r = assignRep({ lead: { service_interest: 'consulting', region: 'MEA' }, reps: REPS });
+  assert.notEqual(r.rep_id, 'rep_hana');
+  assert.equal(r.rep_id, 'rep_amara');
+});
+
+test('a saturated team assigns the least loaded and flags for escalation', () => {
+  const saturated = REPS.map((r) => ({ ...r, open_leads: r.capacity, available: true }));
+  const r = assignRep({ lead: { service_interest: 'consulting' }, reps: saturated });
+  assert.equal(r.escalate, true);
+  assert.equal(r.fallback_level, 'over_capacity');
+  assert.ok(r.rep_id, 'the lead still gets an owner rather than being dropped');
+});
+
+test('no available rep at all escalates rather than silently assigning', () => {
+  const r = assignRep({ lead: {}, reps: REPS.map((x) => ({ ...x, available: false })) });
+  assert.equal(r.rep_id, null);
+  assert.equal(r.escalate, true);
+});
+
+test('a qualified lead routes on its band with nothing held', () => {
+  const scored = { score: 78, band: 'qualified', vip: false, model_version: 'v1' };
+  const r = route({ lead: { consent_status: 'granted' }, scored, conflict: { conflict: false }, dedup: { tier: 'distinct' } });
+  assert.equal(r.disposition, 'qualified');
+  assert.equal(r.hold_outbound, false);
+  assert.equal(r.hold_crm, false);
+  assert.equal(r.assignable, true);
+});
+
+// -------------------------------------------------------------- edge cases 5, 12
+test('a material AI conflict overrides the band and routes to manual review', () => {
+  const scored = { score: 22, band: 'unqualified', vip: false, model_version: 'v1' };
+  const conflict = { conflict: true, reason: 'AI says qualified at 0.91, rules say unqualified — 2 bands apart' };
+  const r = route({ lead: {}, scored, conflict, dedup: { tier: 'distinct' } });
+  assert.equal(r.disposition, 'manual_review');
+  assert.match(r.reason, /2 bands apart/);
+});
+
+test('a VIP holds sales outreach but not the transactional acknowledgement', () => {
+  const scored = { score: 95, band: 'qualified', vip: true, vip_reason: 'score >= 90', model_version: 'v1' };
+  const r = route({ lead: { consent_status: 'granted' }, scored, conflict: { conflict: false }, dedup: { tier: 'distinct' } });
+  assert.equal(r.approval_required, true);
+  assert.equal(r.hold_sales_outreach, true);
+  // The brief's Qualified rule promises immediate confirmation; only the sales
+  // action waits on the manager.
+  assert.equal(r.hold_outbound, false);
+});
+
+// ----------------------------------------------------------------- dedup holds
+test('a probable duplicate keeps processing but freezes anything irreversible', () => {
+  const scored = { score: 82, band: 'qualified', vip: false, model_version: 'v1' };
+  const r = route({ lead: {}, scored, conflict: { conflict: false }, dedup: { tier: 'review' } });
+  assert.equal(r.disposition, 'qualified', 'scoring still applies');
+  assert.equal(r.hold_crm, true);
+  assert.equal(r.hold_outbound, true);
+});
+
+test('the losing side of an auto-merge stops, the master does not', () => {
+  const scored = { score: 82, band: 'qualified', vip: false, model_version: 'v1' };
+  const dedup = { tier: 'auto_merge', master_lead_id: '01AAA', best: { confidence: 0.95 } };
+
+  const loser = route({ lead: { lead_id: '01BBB' }, scored, conflict: {}, dedup });
+  assert.equal(loser.disposition, 'merged');
+  assert.equal(loser.hold_crm, true);
+  assert.equal(loser.hold_outbound, true);
+
+  const master = route({ lead: { lead_id: '01AAA' }, scored, conflict: {}, dedup });
+  assert.equal(master.disposition, 'qualified');
+  assert.equal(master.hold_crm, false);
+});
+
+test('withdrawn consent blocks outbound regardless of score', () => {
+  const scored = { score: 95, band: 'qualified', vip: false, model_version: 'v1' };
+  const r = route({ lead: { consent_status: 'withdrawn' }, scored, conflict: {}, dedup: { tier: 'distinct' } });
+  assert.equal(r.hold_outbound, true);
+  assert.ok(r.holds.some((h) => /consent withdrawn/.test(h.why)));
 });

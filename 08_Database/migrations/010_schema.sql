@@ -66,7 +66,7 @@ CREATE TABLE lead (
   conflict_flag       boolean NOT NULL DEFAULT false,
 
   disposition         text CHECK (disposition IN
-                        ('qualified','nurture','unqualified','manual_review','data_completion')),
+                        ('qualified','nurture','unqualified','manual_review','data_completion','merged')),
   owner_id            text REFERENCES sales_rep(rep_id),
   assignment_reason   text,
   assigned_at         timestamptz,

@@ -6,7 +6,7 @@ import { effectKey, sourceEventKey, classifyFailure, nextBackoffMs, retryAfterMs
 import { scoreLead, bandFor, detectConflict } from './scoring.mjs';
 import { assess, jaroWinkler, tierFor, CIRCUMSTANTIAL_WEIGHTS } from './dedup.mjs';
 import { toCanonical, validate } from './validate.mjs';
-import { ulid, canonicalJson } from './ids.mjs';
+import { ulid, canonicalJson, sha256 } from './ids.mjs';
 
 // ---------------------------------------------------------------- edge case 2
 test('the same number in different formats normalises to one E.164 value', () => {
@@ -69,6 +69,26 @@ test('source event keys are content-derived, so redelivery maps to one lead', ()
 
   // A provider id, when offered, beats hashing.
   assert.equal(sourceEventKey({ source: 'website', providerEventId: 'evt_1', payload }), 'website:id:evt_1');
+});
+
+// The Code node sandbox blocks require('crypto') and exposes no global crypto, so
+// the hash ships with the workflow. That is only acceptable if it is provably the
+// real thing, which is what this checks.
+test('the bundled sha256 matches node:crypto, including at block boundaries', async () => {
+  const { createHash } = await import('node:crypto');
+  const ref = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
+
+  const vectors = ['', 'a', 'abc', 'hello world',
+    ...[55, 56, 57, 63, 64, 65, 119, 120, 1000].map((n) => 'x'.repeat(n))];
+  for (const v of vectors) assert.equal(sha256(v), ref(v), `length ${v.length}`);
+
+  for (let i = 0; i < 500; i++) {
+    let s = '';
+    for (let j = 0; j < Math.floor(Math.random() * 200); j++) {
+      s += String.fromCodePoint(Math.floor(Math.random() * 0x2000) + 1);
+    }
+    assert.equal(sha256(s), ref(s), 'unicode fuzz');
+  }
 });
 
 test('canonical json sorts keys at every depth', () => {

@@ -1,0 +1,17 @@
+{
+  "name": "leadops-mock-services",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Adversarial mocks for Odoo, WhatsApp, enrichment, LLM and booking, with a deterministic fault control plane and a call journal used as the test oracle.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

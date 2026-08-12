@@ -1,0 +1,98 @@
+name: leadops
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # n8n owns this one; the init scripts create leadops alongside it.
+      POSTGRES_DB: n8n
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./08_Database/migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d leadops"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mocks:
+    build: ./07_Mock_Services
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      N8N_BASE_URL: http://n8n:5678
+    ports:
+      - "${MOCKS_PORT:-8080}:8080"
+
+  n8n:
+    image: n8nio/n8n:2.34.5
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mocks:
+        condition: service_healthy
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_WEBHOOK_URL: http://localhost:${N8N_PORT:-5678}/
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-UTC}
+      N8N_LOG_LEVEL: ${N8N_LOG_LEVEL:-info}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      # Local http access only; would be true behind TLS.
+      N8N_SECURE_COOKIE: "false"
+      # Pinned rather than left to default: 2.x warns these defaults are changing,
+      # and a submission that behaves differently on a later patch is a bad demo.
+      N8N_RUNNERS_TASK_TIMEOUT: "300"
+      N8N_UNVERIFIED_PACKAGES_ENABLED: "false"
+
+      # Passed through to workflow expressions as $env.*, so no endpoint or
+      # threshold is baked into an exported workflow.
+      LEADOPS_PG_HOST: postgres
+      LEADOPS_PG_DB: leadops
+      ODOO_BASE_URL: ${ODOO_BASE_URL}
+      WHATSAPP_BASE_URL: ${WHATSAPP_BASE_URL}
+      ENRICHMENT_BASE_URL: ${ENRICHMENT_BASE_URL}
+      AI_BASE_URL: ${AI_BASE_URL}
+      BOOKING_BASE_URL: ${BOOKING_BASE_URL}
+      ODOO_API_KEY: ${ODOO_API_KEY}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN}
+      AI_API_KEY: ${AI_API_KEY}
+      DEDUP_AUTO_MERGE_THRESHOLD: ${DEDUP_AUTO_MERGE_THRESHOLD}
+      DEDUP_REVIEW_THRESHOLD: ${DEDUP_REVIEW_THRESHOLD}
+      SCORE_QUALIFIED_MIN: ${SCORE_QUALIFIED_MIN}
+      SCORE_VIP_MIN: ${SCORE_VIP_MIN}
+      SCORE_NURTURE_MIN: ${SCORE_NURTURE_MIN}
+      SLA_MINUTES: ${SLA_MINUTES}
+      VIP_APPROVAL_TIMEOUT_MINUTES: ${VIP_APPROVAL_TIMEOUT_MINUTES}
+      RETRY_MAX_ATTEMPTS: ${RETRY_MAX_ATTEMPTS}
+      RETRY_BASE_MS: ${RETRY_BASE_MS}
+      RETRY_CAP_MS: ${RETRY_CAP_MS}
+      CLAIM_STALE_SECONDS: ${CLAIM_STALE_SECONDS}
+      HTTP_TIMEOUT_MS: ${HTTP_TIMEOUT_MS}
+      # n8n blocks env access from expressions by default; this opens only the
+      # variables above rather than the whole environment.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    volumes:
+      - n8ndata:/home/node/.n8n
+      - ./02_Workflows:/workflows:ro
+
+volumes:
+  pgdata:
+  n8ndata:

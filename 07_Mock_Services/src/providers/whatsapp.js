@@ -13,6 +13,10 @@ export const router = Router();
 // client message id, some don't. Where they don't, the honest fallback is
 // at-most-once — a missing message beats a duplicate one.
 router.get('/messages/lookup', (req, res) => {
+  // Labelled explicitly: a reconciliation read is not a delivery. The journal is
+  // used as a test oracle for exactly-once, so counting a lookup as a send would
+  // quietly invalidate that evidence.
+  res.locals.journal.outcome = 'lookup';
   const id = byKey.get(req.query.idempotency_key);
   if (!id) return res.status(404).json({ found: false });
   res.json({ found: true, message: messages.get(id) });

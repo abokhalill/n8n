@@ -43,6 +43,7 @@ export function tally({ provider, idempotency_key, path } = {}) {
     calls: rows.length,
     delivered: by('delivered'),
     replayed: by('replayed'),
+    lookups: by('lookup'),
     rejected: by('rejected'),
     faulted: rows.filter((r) => r.fault).length,
   };

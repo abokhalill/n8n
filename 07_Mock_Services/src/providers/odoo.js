@@ -26,6 +26,8 @@ export const router = Router();
 // after a lost ack we need to ask "did effect K land?" rather than guess. Real Odoo
 // has no equivalent — see the known-limitations section.
 router.get('/leads/lookup', (req, res) => {
+  // A reconciliation read is not a write. See the note in whatsapp.js.
+  res.locals.journal.outcome = 'lookup';
   const id = byKey.get(req.query.idempotency_key);
   if (!id) return res.status(404).json({ found: false });
   res.json({ found: true, lead: leads.get(id) });

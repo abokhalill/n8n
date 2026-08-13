@@ -1,0 +1,111 @@
+{
+  "id": "wf51dlqreprocess",
+  "name": "wf-51-dlq-reprocess",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "wf50errorhandler"
+  },
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        -110
+      ],
+      "id": "a7000000-0000-4000-8000-000000000001",
+      "name": "Run manually"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ops/dlq/replay",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        110
+      ],
+      "id": "a7000000-0000-4000-8000-000000000002",
+      "name": "Replay request",
+      "webhookId": "a7000000-0000-4000-8000-0000f0f0f0f0"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first()?.json?.body ?? {};\nreturn [{ json: {\n  ids: Array.isArray(b.ids) ? b.ids.map(String) : null,\n  limit: Number(b.limit) || 25,\n  workflow: $workflow.name,\n  execution_id: $execution.id,\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        0
+      ],
+      "id": "a7000000-0000-4000-8000-000000000003",
+      "name": "Select targets"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Safe manual replay.\n--\n-- The rule that makes it safe: a claim that SUCCEEDED is never disturbed, so an\n-- effect that already happened can never happen twice. A claim that FAILED\n-- PERMANENTLY is cleared, because that effect provably did not happen and an\n-- operator replaying it is an explicit decision to try again.\n--\n-- Everything else falls out of key derivation: the requeued work carries its\n-- original idempotency key, so any effect already committed short-circuits.\nWITH args AS (\n  SELECT $1::jsonb AS a\n),\ntargets AS (\n  SELECT dl.*\n  FROM dead_letter dl, args\n  WHERE dl.resolution = 'open'\n    AND (\n      jsonb_typeof(a->'ids') <> 'array'\n      OR dl.id IN (SELECT (jsonb_array_elements_text(a->'ids'))::bigint)\n    )\n  ORDER BY dl.id\n  LIMIT COALESCE((SELECT (a->>'limit')::int FROM args), 25)\n),\n-- Only failures. A succeeded claim is left exactly as it is.\nclaims_cleared AS (\n  DELETE FROM idempotency_claim c\n  USING targets t\n  WHERE c.key = t.idempotency_key\n    AND c.state = 'failed_permanent'\n  RETURNING c.key\n),\nrequeued AS (\n  INSERT INTO work_queue (kind, lead_id, payload, idempotency_key, run_after, attempt, max_attempts)\n  SELECT t.origin_kind, t.lead_id, t.payload, t.idempotency_key, now(), 0, 5\n  FROM targets t\n  WHERE t.origin_kind IN ('pipeline','outbound','odoo_sync','followup','sla_check','approval_expiry','reconcile')\n  RETURNING id, kind, idempotency_key\n),\n-- Rows that are not replayable work (a corrupted CSV row, an unhandled crash) stay\n-- open. They need a human to correct the input, not a machine to try harder.\nmarked AS (\n  UPDATE dead_letter dl\n  SET resolution = 'replayed', replayed_at = now()\n  FROM targets t\n  WHERE dl.id = t.id\n    AND t.origin_kind IN ('pipeline','outbound','odoo_sync','followup','sla_check','approval_expiry','reconcile')\n  RETURNING dl.id\n),\naudit AS (\n  INSERT INTO event_log (lead_id, workflow, execution_id, step, event_type, decision, inputs, outputs, idempotency_key, severity)\n  SELECT t.lead_id, (SELECT a->>'workflow' FROM args), (SELECT a->>'execution_id' FROM args),\n         'reprocess', 'dlq.replayed', 'requeued',\n         jsonb_build_object('dead_letter_id', t.id, 'origin_kind', t.origin_kind,\n                            'original_error', t.error),\n         jsonb_build_object('claim_cleared', t.idempotency_key IN (SELECT key FROM claims_cleared),\n                            'requeued', t.origin_kind IN (SELECT kind FROM requeued)),\n         t.idempotency_key, 'warn'\n  FROM targets t\n  RETURNING id\n)\nSELECT\n  (SELECT count(*)::int FROM targets)        AS considered,\n  (SELECT count(*)::int FROM requeued)       AS requeued,\n  (SELECT count(*)::int FROM claims_cleared) AS claims_cleared,\n  (SELECT count(*)::int FROM marked)         AS marked_replayed,\n  (SELECT count(*)::int FROM audit)          AS audit_rows,\n  (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', t.id, 'kind', t.origin_kind, 'key', t.idempotency_key)), '[]'::jsonb)\n     FROM targets t)                         AS detail;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json) ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a7000000-0000-4000-8000-000000000004",
+      "name": "Requeue safely",
+      "credentials": {
+        "postgres": {
+          "id": "leadopsPgCred01",
+          "name": "LeadOps Postgres"
+        }
+      },
+      "onError": "stopWorkflow"
+    }
+  ],
+  "connections": {
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Select targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replay request": {
+      "main": [
+        [
+          {
+            "node": "Select targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select targets": {
+      "main": [
+        [
+          {
+            "node": "Requeue safely",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

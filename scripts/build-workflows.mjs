@@ -68,6 +68,14 @@ for (const file of files) {
     if (next !== null && next !== code) { node.parameters.jsCode = next; changed = true; }
   }
 
+  // Every workflow routes unhandled failures to the error handler. Wiring it here
+  // rather than in each generator means a new workflow cannot forget to.
+  const ERROR_WF = 'wf50errorhandler';
+  if (wf.id !== ERROR_WF) {
+    wf.settings ??= {};
+    if (wf.settings.errorWorkflow !== ERROR_WF) { wf.settings.errorWorkflow = ERROR_WF; changed = true; }
+  }
+
   if (!changed) continue;
   if (check) { stale.push(file); continue; }
   writeFileSync(path, JSON.stringify(wf, null, 2) + '\n');

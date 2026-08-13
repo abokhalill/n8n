@@ -1,0 +1,82 @@
+{
+  "id": "wf50errorhandler",
+  "name": "wf-50-error-handler",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -260,
+        0
+      ],
+      "id": "a6000000-0000-4000-8000-000000000001",
+      "name": "On workflow failure"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The Error Trigger hands us the failed execution and its workflow. Capture enough\n// to reproduce the failure without needing the n8n UI to understand it.\nconst e = $input.first().json ?? {};\nconst execution = e.execution ?? {};\nconst workflow = e.workflow ?? {};\nconst err = execution.error ?? {};\n\n// Best-effort: the failing item often carries the lead it was working on.\nconst failedItem = err.item ?? execution.data?.resultData?.lastNodeExecuted ?? null;\nconst leadId = err.lead_id ?? e.lead_id ?? null;\n\nreturn [{ json: {\n  workflow: workflow.name ?? 'unknown',\n  execution_id: String(execution.id ?? ''),\n  lead_id: leadId,\n  // Deliberately null: an unhandled crash has no effect we can name, so it gets no\n  // idempotency key and is always recorded rather than deduped away.\n  idempotency_key: null,\n  payload: {\n    last_node: execution.lastNodeExecuted ?? null,\n    mode: execution.mode ?? null,\n    retry_of: execution.retryOf ?? null,\n    execution_url: execution.url ?? null,\n    failed_item: failedItem,\n  },\n  error: {\n    message: err.message ?? String(err),\n    name: err.name ?? null,\n    node: err.node?.name ?? execution.lastNodeExecuted ?? null,\n    stack: typeof err.stack === 'string' ? err.stack.split('\\n').slice(0, 5).join('\\n') : null,\n  },\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20,
+        0
+      ],
+      "id": "a6000000-0000-4000-8000-000000000002",
+      "name": "Capture failure"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO dead_letter\n  (origin_kind, lead_id, idempotency_key, payload, error, workflow, execution_id, resolution)\nSELECT 'workflow_execution',\n       NULLIF(d->>'lead_id',''),\n       NULLIF(d->>'idempotency_key',''),\n       d->'payload',\n       d->'error',\n       d->>'workflow',\n       d->>'execution_id',\n       'open'\nFROM (SELECT $1::jsonb AS d) input\nON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json) ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        220,
+        0
+      ],
+      "id": "a6000000-0000-4000-8000-000000000003",
+      "name": "Dead letter",
+      "credentials": {
+        "postgres": {
+          "id": "leadopsPgCred01",
+          "name": "LeadOps Postgres"
+        }
+      },
+      "onError": "stopWorkflow"
+    }
+  ],
+  "connections": {
+    "On workflow failure": {
+      "main": [
+        [
+          {
+            "node": "Capture failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture failure": {
+      "main": [
+        [
+          {
+            "node": "Dead letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

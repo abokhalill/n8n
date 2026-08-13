@@ -8,6 +8,7 @@ import { assess, jaroWinkler, tierFor, CIRCUMSTANTIAL_WEIGHTS } from './dedup.mj
 import { toCanonical, validate } from './validate.mjs';
 import { parseCsv } from './csv.mjs';
 import { route, assignRep } from './routing.mjs';
+import { SEQUENCES, nextStep, sequenceStopReason, scaleMinutes, slaBreached, approvalTimeoutAction } from './followup.mjs';
 import { ulid, canonicalJson, sha256 } from './ids.mjs';
 
 // ---------------------------------------------------------------- edge case 2
@@ -457,4 +458,68 @@ test('withdrawn consent blocks outbound regardless of score', () => {
   const r = route({ lead: { consent_status: 'withdrawn' }, scored, conflict: {}, dedup: { tier: 'distinct' } });
   assert.equal(r.hold_outbound, true);
   assert.ok(r.holds.some((h) => /consent withdrawn/.test(h.why)));
+});
+
+// ------------------------------------------------- follow-up, SLA and approvals
+test('qualified and nurture run different cadences, not just different copy', () => {
+  const q = SEQUENCES.qualified.map((s) => s.after_minutes);
+  const n = SEQUENCES.nurture.map((s) => s.after_minutes);
+  assert.equal(q.length, 3);
+  assert.equal(n.length, 3);
+  assert.ok(q.every((v, i) => v < n[i]), 'qualified must be chased faster at every step');
+  assert.ok(q.every((v, i) => i === 0 || v > q[i - 1]), 'intervals must increase');
+});
+
+test('the sequence advances one step at a time and then stops', () => {
+  assert.equal(nextStep({ disposition: 'qualified', currentStep: 0 }).slot, 'followup.1');
+  assert.equal(nextStep({ disposition: 'qualified', currentStep: 2 }).slot, 'followup.3');
+  assert.equal(nextStep({ disposition: 'qualified', currentStep: 3 }), null);
+  assert.equal(nextStep({ disposition: 'unqualified', currentStep: 0 }), null);
+});
+
+// -------------------------------------------------------------- edge case 10
+test('every reason a sequence must stop is caught at dispatch', () => {
+  const base = { disposition: 'qualified', consent_status: 'granted', status: 'routed', dedup_status: 'unique' };
+  assert.equal(sequenceStopReason(base), null, 'a live lead keeps its sequence');
+
+  assert.match(sequenceStopReason({ ...base, consent_status: 'withdrawn' }), /consent withdrawn/);
+  assert.match(sequenceStopReason({ ...base, status: 'replied' }), /replied/);
+  assert.match(sequenceStopReason({ ...base, status: 'closed' }), /closed/);
+  assert.match(sequenceStopReason({ ...base, dedup_status: 'merged_into' }), /merged/);
+  assert.match(sequenceStopReason({ ...base, approval_state: 'rejected' }), /rejected/);
+  assert.match(sequenceStopReason(base, { booking: { booking_id: 'BK-1' } }), /meeting booked/);
+  assert.match(sequenceStopReason(null), /no longer exists/);
+});
+
+test('demo compression shortens intervals without reordering the sequence', () => {
+  const scaled = SEQUENCES.qualified.map((s) => scaleMinutes(s.after_minutes, 0.01));
+  assert.ok(scaled.every((v, i) => i === 0 || v > scaled[i - 1]), 'order survives scaling');
+  assert.ok(scaled[0] < SEQUENCES.qualified[0].after_minutes);
+  assert.equal(scaleMinutes(60, 0), 60, 'a nonsense scale falls back to real time');
+});
+
+test('SLA measures assignment to first logged sales action, nothing else', () => {
+  const assigned = new Date('2026-08-12T10:00:00Z').toISOString();
+  const now = new Date('2026-08-12T10:31:00Z').getTime();
+
+  const breached = slaBreached({ disposition: 'qualified', assigned_at: assigned, last_sales_action_at: null }, { now });
+  assert.equal(breached.breached, true);
+  assert.equal(breached.elapsed_minutes, 31);
+
+  const acted = slaBreached({ disposition: 'qualified', assigned_at: assigned, last_sales_action_at: assigned }, { now });
+  assert.equal(acted.breached, false);
+
+  const early = slaBreached({ disposition: 'qualified', assigned_at: assigned, last_sales_action_at: null },
+    { now: new Date('2026-08-12T10:20:00Z').getTime() });
+  assert.equal(early.breached, false);
+
+  // Only qualified leads carry the SLA.
+  assert.equal(slaBreached({ disposition: 'nurture', assigned_at: assigned }, { now }).breached, false);
+});
+
+test('approval timeout policy is configurable and defaults to the cautious option', () => {
+  assert.equal(approvalTimeoutAction().action, 'escalate');
+  assert.equal(approvalTimeoutAction('send').action, 'release');
+  assert.equal(approvalTimeoutAction('hold').action, 'hold');
+  assert.equal(approvalTimeoutAction('nonsense').action, 'escalate', 'unknown policy fails closed');
 });

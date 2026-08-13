@@ -1,0 +1,11 @@
+{
+  "name": "leadops-operator-console",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Operator view over the pipeline: summary, lead timelines, and the human checkpoints the brief requires — approval, manual review, dead-letter replay.",
+  "main": "src/server.js",
+  "scripts": { "start": "node src/server.js" },
+  "dependencies": { "express": "^5.1.0", "pg": "^8.13.1" },
+  "engines": { "node": ">=20" }
+}

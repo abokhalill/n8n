@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeadOps — Operator Console</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --panel:#fff; --line:#e3e6ea; --ink:#16191d; --dim:#697280;
+    --accent:#2c5fd6; --ok:#1a7f4b; --warn:#a86200; --bad:#b3261e; --info:#5b3fc4;
+    --chip:#eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0e1116; --panel:#151a21; --line:#232a34; --ink:#e6eaef; --dim:#8b95a3;
+      --accent:#6f9bff; --ok:#4ec98a; --warn:#e0a340; --bad:#ff7b6e; --info:#a992ff;
+      --chip:#1d242e;
+    }
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  header {
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+    padding:14px 20px; border-bottom:1px solid var(--line); background:var(--panel);
+    position:sticky; top:0; z-index:10;
+  }
+  h1 { font-size:15px; margin:0; font-weight:650; letter-spacing:.2px; }
+  h1 span { color:var(--dim); font-weight:400; }
+  .grow { flex:1; }
+  button {
+    font:inherit; font-size:13px; padding:6px 11px; border-radius:7px;
+    border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer;
+  }
+  button:hover { border-color:var(--accent); color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.primary:hover { opacity:.9; color:#fff; }
+  button.danger { border-color:var(--bad); color:var(--bad); }
+  button.danger:hover { background:var(--bad); color:#fff; }
+  .toolbar { display:flex; gap:6px; align-items:center; }
+  .toolbar small { color:var(--dim); margin-right:2px; }
+
+  main { padding:18px 20px 40px; max-width:1560px; margin:0 auto; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:10px; margin-bottom:18px; }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:11px 13px; }
+  .tile b { display:block; font-size:23px; font-weight:640; line-height:1.2; }
+  .tile span { color:var(--dim); font-size:11.5px; text-transform:uppercase; letter-spacing:.4px; }
+  .tile.alert b { color:var(--bad); }
+  .tile.attention b { color:var(--warn); }
+
+  .cols { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); gap:16px; }
+  @media (max-width:1080px){ .cols { grid-template-columns:1fr; } }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-bottom:16px; }
+  .panel > h2 {
+    font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--dim);
+    margin:0; padding:11px 14px; border-bottom:1px solid var(--line); font-weight:600;
+  }
+  .panel > h2 em { font-style:normal; color:var(--accent); }
+  .scroll { max-height:460px; overflow:auto; }
+
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--dim); font-weight:600; padding:8px 12px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--panel); }
+  td { padding:8px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tr:last-child td { border-bottom:none; }
+  tbody tr.clickable:hover { background:var(--chip); cursor:pointer; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; }
+  .dim { color:var(--dim); }
+  .empty { padding:22px 14px; color:var(--dim); text-align:center; font-size:13px; }
+
+  .chip { display:inline-block; padding:1.5px 7px; border-radius:20px; font-size:11.5px; font-weight:550; background:var(--chip); color:var(--dim); white-space:nowrap; }
+  .chip.qualified { color:var(--ok); } .chip.nurture { color:var(--warn); }
+  .chip.manual_review { color:var(--info); } .chip.unqualified { color:var(--dim); }
+  .chip.data_completion { color:var(--warn); } .chip.merged { color:var(--accent); }
+  .chip.vip { color:var(--bad); } .chip.pending { color:var(--warn); }
+
+  dialog { border:1px solid var(--line); border-radius:12px; background:var(--panel); color:var(--ink); padding:0; width:min(920px,94vw); max-height:88vh; }
+  dialog::backdrop { background:rgba(0,0,0,.45); }
+  .dhead { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--panel); }
+  .dbody { padding:16px 18px; overflow:auto; max-height:calc(88vh - 60px); }
+  .kv { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:8px 18px; margin-bottom:18px; }
+  .kv div span { display:block; color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.4px; }
+  h3 { font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); margin:20px 0 8px; }
+  .tl { border-left:2px solid var(--line); margin-left:6px; padding-left:14px; }
+  .tl .row { position:relative; padding:6px 0; }
+  .tl .row::before { content:''; position:absolute; left:-19px; top:12px; width:7px; height:7px; border-radius:50%; background:var(--dim); }
+  .tl .row.warn::before { background:var(--warn); } .tl .row.error::before { background:var(--bad); }
+  .tl .row.effect::before { background:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>LeadOps <span>— operator console</span></h1>
+  <div class="grow"></div>
+  <div class="toolbar">
+    <small class="dim">run now:</small>
+    <button onclick="tick('pipeline')">pipeline</button>
+    <button onclick="tick('outbound')">outbound</button>
+    <button onclick="tick('odoo')">CRM sync</button>
+    <button onclick="tick('scheduler')">scheduler</button>
+    <button class="primary" onclick="refresh()">refresh</button>
+  </div>
+</header>
+
+<main>
+  <div class="tiles" id="tiles"></div>
+
+  <div class="cols">
+    <div>
+      <div class="panel">
+        <h2>Leads</h2>
+        <div class="scroll"><table>
+          <thead><tr><th>Name</th><th>Source</th><th>Score</th><th>Disposition</th><th>Owner</th><th>Stage</th></tr></thead>
+          <tbody id="leads"></tbody>
+        </table></div>
+      </div>
+      <div class="panel">
+        <h2>Provider call journal <em>— what actually left the building</em></h2>
+        <div class="scroll" style="max-height:280px"><table>
+          <thead><tr><th>Provider</th><th>Call</th><th>Outcome</th><th>Status</th></tr></thead>
+          <tbody id="journal"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>Approvals awaiting a manager <em>— VIP gate</em></h2>
+        <div id="approvals"></div>
+      </div>
+      <div class="panel">
+        <h2>Manual review queue</h2>
+        <div class="scroll" style="max-height:260px"><table>
+          <thead><tr><th>Lead</th><th>Why</th></tr></thead>
+          <tbody id="review"></tbody>
+        </table></div>
+      </div>
+      <div class="panel">
+        <h2>Dead letters <em>— safe replay</em></h2>
+        <div id="dlq"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<dialog id="detail"><div class="dhead">
+    <strong id="dtitle">Lead</strong><div class="grow"></div>
+    <button onclick="document.getElementById('detail').close()">close</button>
+  </div><div class="dbody" id="dbody"></div></dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const get = (u) => fetch(u).then((r) => r.json());
+const send = (u, b) => fetch(u, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(b||{}) }).then((r) => r.json());
+const chip = (v, cls) => v ? `<span class="chip ${cls ?? v}">${esc(v)}</span>` : '<span class="dim">—</span>';
+const shortId = (s) => s ? String(s).slice(-6) : '—';
+
+const TILES = [
+  ['total_leads','leads'], ['qualified','qualified'], ['nurture','nurture'],
+  ['manual_review','manual review','attention'], ['duplicates_merged','merged'],
+  ['approvals_pending','approvals','attention'], ['queue_pending','queued'],
+  ['dead_lettered_open','dead letters','alert'], ['sla_breached','SLA breached','alert'],
+  ['claims_ambiguous','ambiguous','alert'],
+];
+
+async function refresh() {
+  const [s, leads, approvals, review, dlq, journal] = await Promise.all([
+    get('/api/summary'), get('/api/leads'), get('/api/approvals'),
+    get('/api/review'), get('/api/dlq'), get('/api/journal'),
+  ]);
+
+  $('tiles').innerHTML = TILES.map(([k, label, cls]) => {
+    const v = Number(s[k] ?? 0);
+    return `<div class="tile ${v > 0 && cls ? cls : ''}"><b>${v}</b><span>${label}</span></div>`;
+  }).join('');
+
+  $('leads').innerHTML = leads.length ? leads.map((l) => `
+    <tr class="clickable" onclick="openLead('${l.lead_id}')">
+      <td>${esc(l.full_name ?? '(no name)')}${l.vip_flag ? ' ' + chip('VIP','vip') : ''}
+          <div class="dim mono">…${shortId(l.lead_id)}</div></td>
+      <td>${chip(l.source,'')}</td>
+      <td><b>${l.score ?? '—'}</b></td>
+      <td>${chip(l.disposition)}${l.conflict_flag ? ' ' + chip('conflict','manual_review') : ''}
+          ${l.dedup_status === 'merged_into' && l.disposition !== 'merged' ? ' ' + chip('merged') : ''}</td>
+      <td class="dim">${esc(l.owner_id ?? '—')}</td>
+      <td class="dim">${esc(l.odoo_stage ?? '—')}</td>
+    </tr>`).join('') : '<tr><td colspan="6" class="empty">No leads yet — POST one to /webhook/intake/website</td></tr>';
+
+  $('approvals').innerHTML = approvals.length ? approvals.map((a) => `
+    <div style="padding:12px 14px;border-bottom:1px solid var(--line)">
+      <div><strong>${esc(a.full_name ?? a.lead_id)}</strong> ${chip('score ' + a.score,'vip')}</div>
+      <div class="dim" style="margin:3px 0 9px">${esc(a.company ?? '')} · ${esc(a.status_reason ?? '')}</div>
+      <button class="primary" onclick="decide('${a.token}','${a.lead_id}','approve')">Approve</button>
+      <button class="danger" onclick="decide('${a.token}','${a.lead_id}','reject')">Reject</button>
+    </div>`).join('') : '<div class="empty">Nothing awaiting approval</div>';
+
+  $('review').innerHTML = review.length ? review.map((r) => `
+    <tr><td>${esc(r.full_name ?? r.lead_id)}<div class="dim mono">…${shortId(r.lead_id)}</div></td>
+        <td>${chip(r.disposition)}<div class="dim">${esc(r.status_reason ?? '')}</div></td></tr>`).join('')
+    : '<tr><td colspan="2" class="empty">Queue is clear</td></tr>';
+
+  $('dlq').innerHTML = dlq.length ? `
+    ${dlq.map((d) => `<div style="padding:11px 14px;border-bottom:1px solid var(--line)">
+      <div><strong>${esc(d.origin_kind)}</strong> ${chip(d.error?.reason ?? d.error?.code ?? 'failed','manual_review')}</div>
+      <div class="dim mono" style="font-size:11px;margin-top:3px">${esc(d.idempotency_key ?? '(no key)')}</div>
+    </div>`).join('')}
+    <div style="padding:12px 14px"><button class="primary" onclick="replay()">Replay all safely</button>
+      <div class="dim" style="margin-top:7px;font-size:12px">Succeeded effects are never re-fired; only permanently failed ones are retried.</div>
+    </div>` : '<div class="empty">No dead letters</div>';
+
+  $('journal').innerHTML = journal.length ? journal.map((j) => `
+    <tr><td>${esc(j.provider)}</td>
+        <td class="mono">${esc(j.method)} ${esc(String(j.path).split('?')[0])}</td>
+        <td>${chip(j.outcome, j.outcome === 'delivered' ? 'qualified' : j.outcome === 'rejected' ? 'vip' : 'nurture')}</td>
+        <td class="dim">${j.status ?? '—'}${j.fault ? ' <span class="chip vip">fault: ' + esc(j.fault.mode) + '</span>' : ''}</td></tr>`).join('')
+    : '<tr><td colspan="4" class="empty">No provider calls yet</td></tr>';
+}
+
+async function openLead(id) {
+  const { lead, timeline, dupes, effects } = await get('/api/leads/' + id);
+  $('dtitle').textContent = (lead.full_name ?? 'Lead') + ' · …' + shortId(lead.lead_id);
+
+  const kv = (label, val) => val === null || val === undefined || val === ''
+    ? '' : `<div><span>${label}</span>${esc(val)}</div>`;
+
+  const breakdown = (lead.score_breakdown ?? []).map((r) => `
+    <tr><td class="mono">${esc(r.rule_id)}</td><td><b>${r.points > 0 ? '+' : ''}${r.points}</b></td>
+        <td class="dim">${esc(r.reason)}</td></tr>`).join('');
+
+  $('dbody').innerHTML = `
+    <div class="kv">
+      ${kv('score', lead.score)} ${kv('band', lead.score_band)} ${kv('disposition', lead.disposition)}
+      ${kv('owner', lead.owner_id)} ${kv('assignment', lead.assignment_reason)}
+      ${kv('vip', lead.vip_flag ? 'yes' : '')} ${kv('approval', lead.approval_state)}
+      ${kv('dedup', lead.dedup_status)} ${kv('duplicate of', lead.duplicate_of)}
+      ${kv('consent', lead.consent_status)} ${kv('CRM record', lead.odoo_lead_id)}
+      ${kv('CRM stage', lead.odoo_stage)} ${kv('phone', lead.phone_e164)}
+      ${kv('email', lead.email_normalized)} ${kv('source', lead.source)}
+      ${kv('why', lead.status_reason)}
+    </div>
+
+    ${breakdown ? `<h3>Score breakdown — every point attributable</h3>
+      <table>${breakdown}</table>` : ''}
+
+    ${lead.ai_classification ? `<h3>AI classification — kept separate from the score</h3>
+      <div class="mono dim">${esc(JSON.stringify(lead.ai_classification))}</div>` : ''}
+
+    ${dupes.length ? `<h3>Duplicate assessment</h3><table>
+      <thead><tr><th>Candidate</th><th>Confidence</th><th>Tier</th><th>Evidence</th></tr></thead>
+      ${dupes.map((d) => `<tr><td class="mono">…${shortId(d.candidate_lead_id)}</td>
+        <td><b>${d.confidence}</b></td><td>${chip(d.tier, d.tier === 'auto_merge' ? 'merged' : 'manual_review')}</td>
+        <td class="dim mono" style="font-size:11px">${esc(Object.entries(d.features ?? {}).filter(([, v]) => v === true || (typeof v === 'number' && v > 0)).map(([k, v]) => k + '=' + v).join(' '))}
+        ${d.demoted_reason ? '<br><b>demoted:</b> ' + esc(d.demoted_reason) : ''}</td></tr>`).join('')}
+      </table>` : ''}
+
+    ${effects.length ? `<h3>External effects — claim ledger</h3><table>
+      <thead><tr><th>Effect</th><th>State</th><th>Attempts</th><th>Provider ref</th></tr></thead>
+      ${effects.map((e) => `<tr><td class="mono">${esc(e.effect_domain)}:${esc(e.occurrence)}</td>
+        <td>${chip(e.state, e.state === 'succeeded' ? 'qualified' : e.state === 'failed_permanent' ? 'vip' : 'nurture')}</td>
+        <td>${e.attempt}</td><td class="dim mono">${esc(e.provider_ref ?? '—')}</td></tr>`).join('')}
+      </table>` : ''}
+
+    <h3>Timeline — decisions interleaved with the effects they caused</h3>
+    <div class="tl">${timeline.map((t) => `
+      <div class="row ${t.entry_kind === 'external_effect' ? 'effect' : t.severity}">
+        <span class="dim mono">${new Date(t.ts).toISOString().slice(11,19)}</span>
+        <strong style="margin-left:8px">${esc(t.label)}</strong>
+        ${t.detail ? ' → ' + chip(t.detail, '') : ''}
+      </div>`).join('')}</div>`;
+
+  $('detail').showModal();
+}
+
+async function decide(token, leadId, decision) {
+  const r = await send('/api/approvals/decide', { token, lead_id: leadId, decision });
+  if (r.duplicate_decision) alert('Already decided — this callback was suppressed as a duplicate.');
+  await refresh();
+}
+async function replay() { const r = await send('/api/dlq/replay', {}); alert(`Requeued ${r.requeued ?? 0}, cleared ${r.claims_cleared ?? 0} failed claim(s).`); await refresh(); }
+async function tick(what) { await send('/api/tick/' + what, {}); await refresh(); }
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

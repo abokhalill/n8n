@@ -95,6 +95,23 @@ services:
       - n8ndata:/home/node/.n8n
       - ./02_Workflows:/workflows:ro
 
+  console:
+    build: ./10_Operator_Console
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8090
+      PGHOST: postgres
+      PGDATABASE: leadops
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      N8N_BASE_URL: http://n8n:5678
+      MOCKS_BASE_URL: http://mocks:8080
+    ports:
+      - "${CONSOLE_PORT:-8090}:8090"
+
 volumes:
   pgdata:
   n8ndata:

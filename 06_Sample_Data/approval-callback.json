@@ -1,0 +1,8 @@
+{
+  "token": "REPLACE_WITH_THE_PENDING_APPROVAL_TOKEN",
+  "lead_id": "REPLACE_WITH_A_REAL_LEAD_ID",
+  "decision": "reject",
+  "decided_by": "mgr_dana",
+  "reason": "not a strategic fit this quarter",
+  "_note": "decision is approve or reject. Tokens are issued by Postgres when a VIP lead is gated; find one with: select token from approval_request where state='pending'"
+}

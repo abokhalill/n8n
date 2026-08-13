@@ -54,6 +54,10 @@ CREATE VIEW lead_timeline AS
 SELECT
   lead_id,
   ts,
+  -- Several decisions are written by one statement and therefore share a timestamp.
+  -- Without an insertion-order tiebreak they read back alphabetically, which makes
+  -- the trail look like the pipeline classified before it enriched.
+  id AS seq,
   'decision'                      AS entry_kind,
   event_type                      AS label,
   decision                        AS detail,
@@ -68,6 +72,7 @@ UNION ALL
 SELECT
   entity_id                       AS lead_id,
   COALESCE(settled_at, created_at) AS ts,
+  NULL::bigint                    AS seq,
   'external_effect'               AS entry_kind,
   effect_domain || ':' || occurrence AS label,
   state                           AS detail,

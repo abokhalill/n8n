@@ -1,0 +1,7 @@
+{
+  "lead_id": "REPLACE_WITH_A_REAL_LEAD_ID",
+  "booking_id": "BK-DEMO-1",
+  "times": 2,
+  "rep_email": "amara@example.test",
+  "_note": "times:2 makes the mock deliver the identical webhook twice — edge case 11"
+}

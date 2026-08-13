@@ -84,6 +84,8 @@ services:
       RETRY_CAP_MS: ${RETRY_CAP_MS}
       CLAIM_STALE_SECONDS: ${CLAIM_STALE_SECONDS}
       HTTP_TIMEOUT_MS: ${HTTP_TIMEOUT_MS}
+      FOLLOWUP_TIME_SCALE: ${FOLLOWUP_TIME_SCALE}
+      VIP_APPROVAL_ON_TIMEOUT: ${VIP_APPROVAL_ON_TIMEOUT}
       # n8n blocks env access from expressions by default; this opens only the
       # variables above rather than the whole environment.
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"

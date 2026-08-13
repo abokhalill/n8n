@@ -56,19 +56,34 @@ export function sequenceStopReason(lead, { booking = null } = {}) {
 // SLA is measured from assignment to the first logged sales action. Viewing a record
 // is not an action; the definition is deliberately narrow, because a broad one makes
 // the SLA unenforceable.
-export function slaBreached(lead, { slaMinutes = 30, now = Date.now() } = {}) {
+export function slaBreached(lead, { slaMinutes = 30, now = Date.now(), approvedAt = null } = {}) {
   if (lead.disposition !== 'qualified') return { breached: false, reason: 'not a qualified lead' };
   if (lead.last_sales_action_at) return { breached: false, reason: 'sales action already logged' };
   if (!lead.assigned_at) return { breached: false, reason: 'never assigned' };
 
-  const elapsed = (now - new Date(lead.assigned_at).getTime()) / 60000;
+  // The clock cannot run while we are the ones blocking the rep. A VIP lead holds
+  // sales outreach pending manager approval, so measuring the rep against an SLA in
+  // that window would escalate them for a breach the system itself caused.
+  if (lead.approval_state === 'pending') {
+    return { breached: false, paused: true, reason: 'clock paused pending VIP approval' };
+  }
+
+  // For a gated lead the rep only becomes able to act when approval lands, so the
+  // window runs from whichever came later.
+  const assignedMs = new Date(lead.assigned_at).getTime();
+  const approvedMs = approvedAt ? new Date(approvedAt).getTime() : 0;
+  const startedMs = Math.max(assignedMs, approvedMs);
+  const from = approvedMs > assignedMs ? 'approval' : 'assignment';
+
+  const elapsed = (now - startedMs) / 60000;
   return {
     breached: elapsed >= slaMinutes,
     elapsed_minutes: Math.round(elapsed),
     threshold_minutes: slaMinutes,
+    measured_from: from,
     reason: elapsed >= slaMinutes
-      ? `no sales action ${Math.round(elapsed)} minutes after assignment`
-      : `within SLA (${Math.round(elapsed)} of ${slaMinutes} minutes)`,
+      ? `no sales action ${Math.round(elapsed)} minutes after ${from}`
+      : `within SLA (${Math.round(elapsed)} of ${slaMinutes} minutes since ${from})`,
   };
 }
 

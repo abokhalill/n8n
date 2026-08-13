@@ -523,3 +523,45 @@ test('approval timeout policy is configurable and defaults to the cautious optio
   assert.equal(approvalTimeoutAction('hold').action, 'hold');
   assert.equal(approvalTimeoutAction('nonsense').action, 'escalate', 'unknown policy fails closed');
 });
+
+// A VIP lead holds sales outreach pending approval. Measuring the rep against an SLA
+// in that window escalates them for a breach the system itself created.
+test('the SLA clock pauses while a VIP lead is gated on approval', () => {
+  const assigned = new Date('2026-08-12T10:00:00Z').toISOString();
+  const now = new Date('2026-08-12T10:45:00Z').getTime();
+  const gated = { disposition: 'qualified', assigned_at: assigned, last_sales_action_at: null,
+    approval_state: 'pending' };
+
+  const r = slaBreached(gated, { now });
+  assert.equal(r.breached, false, '45 minutes in, but the rep was never allowed to act');
+  assert.equal(r.paused, true);
+  assert.match(r.reason, /paused pending VIP approval/);
+});
+
+test('once approval lands the SLA runs from approval, not from assignment', () => {
+  const assigned = new Date('2026-08-12T10:00:00Z').toISOString();
+  const approved = new Date('2026-08-12T10:40:00Z').toISOString();
+
+  // Ten minutes after approval: inside the window even though 50 have passed since
+  // assignment.
+  const early = slaBreached(
+    { disposition: 'qualified', assigned_at: assigned, approval_state: 'approved' },
+    { now: new Date('2026-08-12T10:50:00Z').getTime(), approvedAt: approved });
+  assert.equal(early.breached, false, `got ${early.elapsed_minutes}m`);
+  assert.equal(early.measured_from, 'approval');
+
+  // Thirty-one minutes after approval: now genuinely breached.
+  const late = slaBreached(
+    { disposition: 'qualified', assigned_at: assigned, approval_state: 'approved' },
+    { now: new Date('2026-08-12T11:11:00Z').getTime(), approvedAt: approved });
+  assert.equal(late.breached, true);
+  assert.match(late.reason, /after approval/);
+});
+
+test('a lead that was never gated still measures from assignment', () => {
+  const assigned = new Date('2026-08-12T10:00:00Z').toISOString();
+  const r = slaBreached({ disposition: 'qualified', assigned_at: assigned, approval_state: 'not_required' },
+    { now: new Date('2026-08-12T10:31:00Z').getTime() });
+  assert.equal(r.breached, true);
+  assert.equal(r.measured_from, 'assignment');
+});

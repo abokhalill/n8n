@@ -126,13 +126,20 @@ provider is a one-line base-URL change.
 | `SLA_MINUTES` | `30` | Qualified lead with no sales action |
 | `VIP_APPROVAL_ON_TIMEOUT` | `escalate` | `escalate` \| `send` \| `hold` — see below |
 | `FOLLOWUP_TIME_SCALE` | `1` | Compresses follow-up intervals for demos |
-| `RETRY_BASE_MS` / `RETRY_CAP_MS` | `2000` / `900000` | Full-jitter backoff bounds |
+| `RETRY_BASE_MS` / `RETRY_CAP_MS` | `2000` / `900000` | Full-jitter backoff bounds — see note |
+| `RETRY_MAX_ATTEMPTS` | `5` | Attempts before an effect is dead-lettered |
 
 **`VIP_APPROVAL_ON_TIMEOUT` is a business decision, not an engineering one.** If a
 manager never answers a VIP approval, sending anyway risks an unapproved message to a
 strategic account; holding risks silence on the highest-value lead in the funnel. The
 default fails closed and escalates to a second approver. An unrecognised value also
 fails closed.
+
+**`RETRY_CAP_MS` is not reachable at the default attempt count.** Backoff is
+`random(0, min(2000 × 2^attempt, cap))`, so five attempts top out around 64 seconds
+and the 15-minute cap never binds. It is a ceiling for higher `RETRY_MAX_ATTEMPTS`,
+not a value the default configuration ever reaches. Left in place deliberately so
+raising the attempt count stays bounded.
 
 **`FOLLOWUP_TIME_SCALE`** exists because the real cadence is 1h/24h/72h for qualified
 leads and 3d/10d/30d for nurture, which nobody sits through in a walkthrough. `0.002`

@@ -32,7 +32,7 @@ CRM mock record count — rather than against what the pipeline reports about it
 **PASS**
 
 - **pass** — two source events produced two lead records
-- **pass** — the pair was linked, not left separate `master=01KZXGSCWQ56FCFWHAA28EZAFW merged=01KZXGSDG450027SC5EB46CR8C`
+- **pass** — the pair was linked, not left separate `master=01KZXJFSACC5V2TQRWPZC7HVMB merged=01KZXJFSXWSKV5G171A4T17KVF`
 - **pass** — auto-merge tier on a decisive identifier match `tier=auto_merge conf=0.95`
 - **pass** — cross-source was recorded as a supporting signal
 - **pass** — exactly one CRM record exists `1 records`

@@ -42,10 +42,15 @@ SELECT
   (SELECT count(*) FROM work_queue WHERE state = 'pending')                      AS queue_pending,
   (SELECT count(*) FROM work_queue WHERE state = 'dead')                         AS queue_dead,
   (SELECT count(*) FROM claims_needing_reconciliation)                           AS claims_ambiguous,
+  -- Threshold read from app_config rather than hardcoded, so the summary cannot
+  -- disagree with the engine when SLA_MINUTES changes. And gated leads are excluded
+  -- for the same reason the engine excludes them: the rep is blocked from acting, so
+  -- counting them as breaches reports a failure the system itself caused.
   (SELECT count(*) FROM lead
      WHERE disposition = 'qualified'
        AND last_sales_action_at IS NULL
-       AND assigned_at < now() - interval '30 minutes')                          AS sla_breached;
+       AND approval_state <> 'pending'
+       AND assigned_at < now() - (config_int('sla_minutes', 30) * interval '1 minute')) AS sla_breached;
 
 -- "Why did this lead get this result?" answered in one query. Interleaves the
 -- decisions (event_log) with the external effects they caused (idempotency_claim),

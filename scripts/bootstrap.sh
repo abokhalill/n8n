@@ -61,6 +61,14 @@ docker compose exec -T n8n n8n import:credentials --input=/tmp/creds.json 2>&1 |
 docker compose exec -T n8n rm -f /tmp/creds.json
 rm -f "$CREDS"
 
+step "runtime config"
+# A SQL view cannot read .env, so the values it needs are synced here. .env stays the
+# single authored source; this keeps the database's copy from drifting.
+docker compose exec -T postgres psql -U "$POSTGRES_USER" -d leadops -q -c \
+  "INSERT INTO app_config (key, value) VALUES ('sla_minutes', '${SLA_MINUTES:-30}')
+   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();" >/dev/null
+say "sla_minutes = ${SLA_MINUTES:-30}"
+
 step "workflows"
 shopt -s nullglob
 FILES=(02_Workflows/*.json)

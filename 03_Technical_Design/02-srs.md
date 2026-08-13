@@ -404,6 +404,8 @@ Burning five attempts on a 401 is slow and useless, and the brief names missing
 credentials as its own case.
 
 **Backoff** is full jitter: `random(0, min(2s × 2^attempt, 15min))`, five attempts.
+At five attempts the sequence tops out around 64 seconds, so the 15-minute cap never
+binds — it is a ceiling for higher attempt counts, not a value the default reaches.
 Full jitter over equal jitter because it decorrelates retry storms harder. A `Retry-After`
 header, when the provider offers one, beats our own computation.
 
@@ -525,6 +527,11 @@ Ordered by how much they would matter in production.
 
 7. **Tick granularity means the 30-minute SLA fires at 30–31 minutes.** Stated so it is
    not mistaken for a bug.
+
+   Related: the SLA threshold is authored in `.env` but a SQL view cannot read that,
+   so `bootstrap.sh` syncs it into an `app_config` row that `ops_summary` reads via
+   `config_int()`. Changing `SLA_MINUTES` therefore requires re-running bootstrap, or
+   the summary and the engine will disagree.
 
 8. **Edge case 12's compensation is deliberately partial.** Already-delivered messages
    cannot be recalled; only future effects are cancelled.

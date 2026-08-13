@@ -10,6 +10,18 @@
 -- Enum-ish columns use text + CHECK rather than native enums: adding a value to a
 -- PG enum needs DDL and can't run in a transaction with other work. Cheap to widen later.
 
+-- Runtime configuration the database itself needs to know about. .env remains the
+-- authored source of truth; bootstrap.sh syncs the values a SQL view cannot read.
+CREATE TABLE app_config (
+  key        text PRIMARY KEY,
+  value      text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE FUNCTION config_int(p_key text, p_default int) RETURNS int AS $$
+  SELECT COALESCE((SELECT value::int FROM app_config WHERE key = p_key), p_default);
+$$ LANGUAGE sql STABLE;
+
 CREATE TABLE sales_rep (
   rep_id             text PRIMARY KEY,
   name               text NOT NULL,

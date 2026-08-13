@@ -1,5 +1,8 @@
 \connect leadops
 
+INSERT INTO app_config (key, value) VALUES ('sla_minutes', '30')
+  ON CONFLICT (key) DO NOTHING;
+
 -- Reps live here rather than in Odoo so workload routing and edge case 9
 -- (rep goes unavailable mid-flight) are demonstrable without a live CRM.
 -- Production would read this from the CRM; see the assumptions section.

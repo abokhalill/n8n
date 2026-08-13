@@ -195,6 +195,70 @@
         }
       },
       "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "content": "## The pipeline — every decision, no side effects\nDedup, enrichment, scoring, AI classification, routing and assignment.\n\n**This workflow performs no external writes.** Its only outbound calls are two reads. Everything side-effecting is *enqueued* for the dispatcher that owns it — which is precisely what makes the whole pipeline safe to re-run (**edge case 14**).",
+        "height": 220,
+        "width": 900,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -700,
+        -340
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf10pipe0000",
+      "name": "Note 1"
+    },
+    {
+      "parameters": {
+        "content": "### The AI is an untrusted service\nResponses are requested as **text, not JSON**, so a malformed body is ours to inspect rather than a node crash.\n\nEmpty, truncated and unparseable all degrade to score-only with a stated reason (**edge case 4**). The model never feeds the score — it produces an independent label, and disagreement is a *routing* signal (**edge case 5**).",
+        "height": 230,
+        "width": 480,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf10pipe0001",
+      "name": "Note 2"
+    },
+    {
+      "parameters": {
+        "content": "### One statement commits everything\nLead update, dedup decisions, audit rows, approval request, downstream queue items and work completion.\n\nThe `version` predicate is the compare-and-set: if another workflow wrote this lead while we were deciding, **zero rows update and every dependent CTE produces nothing**. No partial application.",
+        "height": 220,
+        "width": 460,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        700,
+        -340
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf10pipe0002",
+      "name": "Note 3"
+    },
+    {
+      "parameters": {
+        "content": "### Retry lives in the queue\nA retryable enrichment failure hands the item back with full-jitter backoff (**edge case 3**).\n\nOnce attempts are spent the lead proceeds degraded — a provider that is down must not hold a lead hostage forever.",
+        "height": 170,
+        "width": 420,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -260,
+        200
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf10pipe0003",
+      "name": "Note 4"
     }
   ],
   "connections": {

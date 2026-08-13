@@ -23,11 +23,21 @@ activated by script.
 
 | Service | Where |
 |---|---|
+| **Operator console** | **`http://localhost:8090`** — start here |
 | n8n editor | `http://localhost:5678` (credentials in `.env`) |
 | Mock providers + control plane | `http://localhost:8080` |
 | Database | `psql -h localhost -U leadops -d leadops` |
 
 ## See it work
+
+Open **`http://localhost:8090`**. The console is the fastest way in: summary tiles,
+every lead with its score breakdown and timeline, the provider call journal, and the
+three human checkpoints as actual buttons — approve or reject a VIP, work the manual
+review queue, replay a dead letter. Every button drives the real workflow, so clicking
+Reject twice is suppressed as a duplicate exactly as a provider redelivering would be.
+
+The `run now` buttons trigger each queue consumer on demand. They run on a one-minute
+schedule anyway; the buttons just avoid waiting while someone is watching.
 
 ```bash
 ./scripts/demo.sh                          # narrated walkthrough of one lead
@@ -96,7 +106,12 @@ Full reasoning in [`03_Technical_Design/02-srs.md`](03_Technical_Design/02-srs.m
 | `07_Mock_Services/` | Odoo, WhatsApp, enrichment, LLM, booking + fault control plane |
 | `08_Database/` | Schema, views, fixtures |
 | `09_Lib/` | Pure logic, unit tested, injected into Code nodes by the build script |
-| `scripts/` | Bootstrap, demo, ops report, workflow build |
+| `10_Operator_Console/` | Operator UI — summary, lead timelines, approvals, DLQ replay |
+| `scripts/` | Bootstrap, demo, ops report, workflow build and canvas annotation |
+
+Each n8n canvas carries sticky notes explaining what it does and which edge case
+forced it — the reasoning otherwise lives inside Code nodes and SQL that nobody opens.
+Regenerate them with `node scripts/annotate-workflows.mjs`.
 
 ### The workflows
 

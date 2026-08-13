@@ -53,6 +53,22 @@
         }
       },
       "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "content": "## The net under the net\nEvery workflow routes unhandled failures here, wired in by the build script rather than by hand so a new workflow cannot forget to.\n\nIn-flow failures are already classified and retried by the dispatchers. This catches only what nobody anticipated — so it records no idempotency key and is never deduped away.",
+        "height": 200,
+        "width": 700,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        -280
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf50erro0000",
+      "name": "Note 1"
     }
   ],
   "connections": {

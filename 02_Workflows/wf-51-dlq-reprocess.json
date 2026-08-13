@@ -71,6 +71,22 @@
         }
       },
       "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "content": "## Safe manual replay\n**Edge case 14.** One rule makes it safe:\n\nA claim that **succeeded** is never touched — an effect that already happened cannot happen twice. A claim that **failed permanently** is cleared, because that effect provably did not happen and an operator replaying it is an explicit decision to retry.\n\nRequeued work carries its original key, so anything already committed short-circuits. Rows that are not replayable work — a corrupt CSV row, an unhandled crash — stay open for a human.",
+        "height": 230,
+        "width": 820,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -520,
+        -300
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf51dlqr0000",
+      "name": "Note 1"
     }
   ],
   "connections": {

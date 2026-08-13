@@ -104,6 +104,38 @@
         }
       },
       "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "content": "## One dispatcher for everything time-based\nFollow-ups, SLA checks and approval expiry are the same problem: **do X at time T, revalidating state at T.**\n\nThey live in a table rather than in a Wait node because an n8n `Wait` cannot be cancelled or signalled from outside — a scheduled follow-up would be uncancellable and would not survive a restart.",
+        "height": 240,
+        "width": 900,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -700,
+        -350
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf30sche0000",
+      "name": "Note 1"
+    },
+    {
+      "parameters": {
+        "content": "### Nothing scheduled is trusted to still be right\nThe lead is re-read **at dispatch**, never taken from what was queued.\n\n• Opt-out after scheduling → sequence stops (**edge case 10**)\n• Owner went unavailable → escalate and reassign, with a fresh clock (**edge case 9**)\n• VIP still awaiting approval → the SLA clock **pauses**, because the rep is blocked from acting by our own gate. Measuring them would escalate a breach the system itself caused.",
+        "height": 250,
+        "width": 640,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        190
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf30sche0001",
+      "name": "Note 2"
     }
   ],
   "connections": {

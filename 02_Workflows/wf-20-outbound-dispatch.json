@@ -150,6 +150,54 @@
         }
       },
       "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "content": "## The only workflow that sends messages\nOne enforcement point is the point. A protocol implemented in five workflows is enforced in none.\n\nClaim → call → commit. The claim is written **before** the call, so a crash between calling and recording is recoverable rather than ambiguous forever.",
+        "height": 210,
+        "width": 880,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -700,
+        -330
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf20outb0000",
+      "name": "Note 1"
+    },
+    {
+      "parameters": {
+        "content": "### The distinction that makes retries safe\n**A provider that answered** tells us the effect definitively did not happen — retry freely.\n\n**Silence** — timeout, socket reset, a crash mid-call — is genuinely ambiguous, so we ask the provider by key rather than guess. Guessing either double-sends or drops (**edge cases 7, 8**).\n\nState is also re-read here: an opt-out that arrived after this was queued is caught now (**edge case 10**).",
+        "height": 240,
+        "width": 560,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        200
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf20outb0001",
+      "name": "Note 2"
+    },
+    {
+      "parameters": {
+        "content": "### Two independent layers\nThe idempotency key travels as a request header too, so the provider dedupes as well as we do.\n\nBelt and braces: our claim record, and the provider's own idempotency.",
+        "height": 180,
+        "width": 420,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        380,
+        200
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf20outb0002",
+      "name": "Note 3"
     }
   ],
   "connections": {

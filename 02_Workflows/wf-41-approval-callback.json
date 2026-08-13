@@ -90,6 +90,38 @@
       ],
       "id": "a5000000-0000-4000-8000-000000000005",
       "name": "Acknowledge"
+    },
+    {
+      "parameters": {
+        "content": "## The VIP gate\n**Edge case 12.** Keyed on the approval token, so a manager clicking twice decides once.\n\nResolves a collision in the brief's own rules: a score-95 lead is both *Qualified* (immediate confirmation) and *VIP* (approval before outbound). A transactional acknowledgement is **not** a sales action — the ack sends, only outreach waits.",
+        "height": 230,
+        "width": 820,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        -330
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf41appr0000",
+      "name": "Note 1"
+    },
+    {
+      "parameters": {
+        "content": "### Rejection compensates forward only\nCancel pending outbound and follow-ups, roll the funnel back with an explicit reason, audit it.\n\n**No retraction message is sent.** Anything already delivered cannot be recalled, and a second unsolicited contact is worse than silence. This is deliberately incomplete rollback, and it is called out rather than smoothed over.",
+        "height": 220,
+        "width": 560,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        40,
+        220
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf41appr0001",
+      "name": "Note 2"
     }
   ],
   "connections": {

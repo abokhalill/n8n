@@ -90,6 +90,54 @@
       ],
       "id": "a1000000-0000-4000-8000-000000000005",
       "name": "Acknowledge"
+    },
+    {
+      "parameters": {
+        "content": "## Intake — acknowledge fast, process never\nThis workflow normalises, derives two keys, persists, enqueues and returns. It deliberately does **no** enrichment, scoring or messaging.\n\nThat is what lets the same person arriving from two sources be reconciled **once, downstream**, instead of two webhook handlers racing each other.",
+        "height": 200,
+        "width": 700,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -260,
+        -300
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf01inta0000",
+      "name": "Note 1"
+    },
+    {
+      "parameters": {
+        "content": "### The key everything depends on\n`source_event_key = hash(source, provider event id ?? payload)` has a UNIQUE index.\n\nA redelivered webhook finds the existing row and reuses the **original lead_id**. Every downstream idempotency key is derived from that id — if it changed on redelivery, every effect would fire twice.",
+        "height": 210,
+        "width": 460,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -30,
+        200
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf01inta0001",
+      "name": "Note 2"
+    },
+    {
+      "parameters": {
+        "content": "### One statement, all of it\nClaim the event, create the lead, enqueue the pipeline and write the audit row — atomically.\n\n`ON CONFLICT DO NOTHING` is what makes a duplicate delivery a no-op. Returns the original lead_id with HTTP 200 instead of 202, so a retrying client converges.",
+        "height": 210,
+        "width": 520,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf01inta0002",
+      "name": "Note 3"
     }
   ],
   "connections": {

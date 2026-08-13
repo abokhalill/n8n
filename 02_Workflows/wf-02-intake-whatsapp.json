@@ -90,6 +90,22 @@
       ],
       "id": "b2000000-0000-4000-8000-000000000005",
       "name": "Acknowledge"
+    },
+    {
+      "parameters": {
+        "content": "## WhatsApp intake\nSame shape as the website intake, different field names.\n\nThe one real difference: WhatsApp gives every message a stable `message_id`, so redelivery is detected on the **provider's own identifier** rather than on a content hash. Provider ids beat hashing whenever they are offered.",
+        "height": 190,
+        "width": 700,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -260,
+        -300
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf02inta0000",
+      "name": "Note 1"
     }
   ],
   "connections": {

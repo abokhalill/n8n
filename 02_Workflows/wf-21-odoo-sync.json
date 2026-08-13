@@ -150,6 +150,38 @@
         }
       },
       "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "content": "## The only workflow that writes to the CRM\nSame claim/commit protocol as outbound — it shares the exact same two SQL statements, because implementing it twice is how the two drift apart.",
+        "height": 210,
+        "width": 880,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -700,
+        -330
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf21odoo0000",
+      "name": "Note 1"
+    },
+    {
+      "parameters": {
+        "content": "### The stage lattice\nStages carry a rank. A transition that lowers it is **refused** unless it carries an explicit `rollback_reason`.\n\nStage changes come from qualification, follow-up, booking, manager rejection and SLA escalation. Without ordering protection a slow writer regresses a lead from *Meeting Booked* back to *Contacted* — invisible until someone notices the funnel is wrong.\n\nRe-setting the current stage is a no-op, not a conflict, so stage writes are safely repeatable.",
+        "height": 230,
+        "width": 620,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        200
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf21odoo0001",
+      "name": "Note 2"
     }
   ],
   "connections": {

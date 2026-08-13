@@ -161,6 +161,38 @@
       ],
       "id": "c3000000-0000-4000-8000-000000000008",
       "name": "Acknowledge"
+    },
+    {
+      "parameters": {
+        "content": "## CSV import — a batch is not atomic\n**Edge case 13.** Each row is parsed, validated and keyed independently, so one corrupt row is quarantined rather than failing the import.\n\nRows are keyed on their own content, so re-importing the same file is a no-op instead of a second copy of every lead.",
+        "height": 210,
+        "width": 760,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        -320
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf03inta0000",
+      "name": "Note 1"
+    },
+    {
+      "parameters": {
+        "content": "### Quarantine, not discard\nBad rows keep their original text and line number in `dead_letter` so a human can correct and resubmit them.\n\nThey carry an idempotency key too — re-importing the same broken file must not queue the same problem twice.",
+        "height": 190,
+        "width": 520,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        180,
+        250
+      ],
+      "id": "aaaaaaaa-bbbb-4ccc-8ddd-wf03inta0001",
+      "name": "Note 2"
     }
   ],
   "connections": {

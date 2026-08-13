@@ -231,7 +231,7 @@
     {
       "parameters": {
         "content": "### One statement commits everything\nLead update, dedup decisions, audit rows, approval request, downstream queue items and work completion.\n\nThe `version` predicate is the compare-and-set: if another workflow wrote this lead while we were deciding, **zero rows update and every dependent CTE produces nothing**. No partial application.",
-        "height": 220,
+        "height": 230,
         "width": 460,
         "color": 5
       },
@@ -247,8 +247,8 @@
     {
       "parameters": {
         "content": "### Retry lives in the queue\nA retryable enrichment failure hands the item back with full-jitter backoff (**edge case 3**).\n\nOnce attempts are spent the lead proceeds degraded — a provider that is down must not hold a lead hostage forever.",
-        "height": 170,
-        "width": 420,
+        "height": 210,
+        "width": 460,
         "color": 3
       },
       "type": "n8n-nodes-base.stickyNote",

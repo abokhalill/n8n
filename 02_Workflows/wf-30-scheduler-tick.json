@@ -124,7 +124,7 @@
     {
       "parameters": {
         "content": "### Nothing scheduled is trusted to still be right\nThe lead is re-read **at dispatch**, never taken from what was queued.\n\n• Opt-out after scheduling → sequence stops (**edge case 10**)\n• Owner went unavailable → escalate and reassign, with a fresh clock (**edge case 9**)\n• VIP still awaiting approval → the SLA clock **pauses**, because the rep is blocked from acting by our own gate. Measuring them would escalate a breach the system itself caused.",
-        "height": 250,
+        "height": 251,
         "width": 640,
         "color": 6
       },

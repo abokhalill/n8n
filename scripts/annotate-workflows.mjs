@@ -60,7 +60,7 @@ Empty, truncated and unparseable all degrade to score-only with a stated reason 
 Lead update, dedup decisions, audit rows, approval request, downstream queue items and work completion.
 
 The \`version\` predicate is the compare-and-set: if another workflow wrote this lead while we were deciding, **zero rows update and every dependent CTE produces nothing**. No partial application.`],
-    [-260, 200, 420, 170, 3, `### Retry lives in the queue
+    [-260, 200, 460, 210, 3, `### Retry lives in the queue
 A retryable enrichment failure hands the item back with full-jitter backoff (**edge case 3**).
 
 Once attempts are spent the lead proceeds degraded — a provider that is down must not hold a lead hostage forever.`],
@@ -145,7 +145,15 @@ for (const file of readdirSync(WF).filter((f) => f.endsWith('.json'))) {
   if (!notes) { console.log(`  no notes defined for ${wf.name}`); continue; }
 
   wf.nodes = wf.nodes.filter((n) => n.type !== 'n8n-nodes-base.stickyNote');
-  notes.forEach(([x, y, width, height, color, content], i) => {
+  notes.forEach(([x, y, width, minHeight, color, content], i) => {
+    // Sized from the content rather than by hand. A clipped note is worse than no
+    // note — it looks like the explanation ran out halfway.
+    const perLine = Math.max(24, Math.floor(width / 7.6));
+    const lines = content.split('\n').reduce((n, line) =>
+      n + Math.max(1, Math.ceil(line.length / perLine)), 0);
+    const blanks = content.split('\n').filter((l) => l.trim() === '').length;
+    const height = Math.max(minHeight, 56 + lines * 21 + blanks * 6);
+
     wf.nodes.push({
       parameters: { content, height, width, color },
       type: 'n8n-nodes-base.stickyNote',

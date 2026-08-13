@@ -110,7 +110,7 @@
     {
       "parameters": {
         "content": "### The key everything depends on\n`source_event_key = hash(source, provider event id ?? payload)` has a UNIQUE index.\n\nA redelivered webhook finds the existing row and reuses the **original lead_id**. Every downstream idempotency key is derived from that id — if it changed on redelivery, every effect would fire twice.",
-        "height": 210,
+        "height": 230,
         "width": 460,
         "color": 6
       },

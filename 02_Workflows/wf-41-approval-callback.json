@@ -110,7 +110,7 @@
     {
       "parameters": {
         "content": "### Rejection compensates forward only\nCancel pending outbound and follow-ups, roll the funnel back with an explicit reason, audit it.\n\n**No retraction message is sent.** Anything already delivered cannot be recalled, and a second unsolicited contact is worse than silence. This is deliberately incomplete rollback, and it is called out rather than smoothed over.",
-        "height": 220,
+        "height": 230,
         "width": 560,
         "color": 7
       },

@@ -170,7 +170,7 @@
     {
       "parameters": {
         "content": "### The distinction that makes retries safe\n**A provider that answered** tells us the effect definitively did not happen — retry freely.\n\n**Silence** — timeout, socket reset, a crash mid-call — is genuinely ambiguous, so we ask the provider by key rather than guess. Guessing either double-sends or drops (**edge cases 7, 8**).\n\nState is also re-read here: an opt-out that arrived after this was queued is caught now (**edge case 10**).",
-        "height": 240,
+        "height": 278,
         "width": 560,
         "color": 6
       },
@@ -186,7 +186,7 @@
     {
       "parameters": {
         "content": "### Two independent layers\nThe idempotency key travels as a request header too, so the provider dedupes as well as we do.\n\nBelt and braces: our claim record, and the provider's own idempotency.",
-        "height": 180,
+        "height": 188,
         "width": 420,
         "color": 5
       },

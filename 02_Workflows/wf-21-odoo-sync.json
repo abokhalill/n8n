@@ -170,7 +170,7 @@
     {
       "parameters": {
         "content": "### The stage lattice\nStages carry a rank. A transition that lowers it is **refused** unless it carries an explicit `rollback_reason`.\n\nStage changes come from qualification, follow-up, booking, manager rejection and SLA escalation. Without ordering protection a slow writer regresses a lead from *Meeting Booked* back to *Contacted* — invisible until someone notices the funnel is wrong.\n\nRe-setting the current stage is a no-op, not a conflict, so stage writes are safely repeatable.",
-        "height": 230,
+        "height": 299,
         "width": 620,
         "color": 6
       },

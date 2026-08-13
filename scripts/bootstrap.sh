@@ -21,29 +21,50 @@ step() { printf '\n▸ %s\n' "$*"; }
 # Reads a field out of a JSON document on stdin without needing jq on the host.
 jget() { node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const v=$1;console.log(v==null?'':v)}catch{console.log('')}})"; }
 
+setup_owner() {
+  curl -s --max-time 20 -X POST "$N8N/rest/owner/setup" -H 'content-type: application/json' \
+    -d "{\"email\":\"$N8N_OWNER_EMAIL\",\"firstName\":\"$N8N_OWNER_FIRST_NAME\",\"lastName\":\"$N8N_OWNER_LAST_NAME\",\"password\":\"$N8N_OWNER_PASSWORD\"}" \
+    -o /dev/null || true
+}
+try_login() {
+  : > "$COOKIE"
+  curl -s --max-time 20 -c "$COOKIE" -X POST "$N8N/rest/login" -H 'content-type: application/json' \
+    -d "{\"emailOrLdapLoginId\":\"$N8N_OWNER_EMAIL\",\"password\":\"$N8N_OWNER_PASSWORD\"}" -o /dev/null || true
+  grep -q 'n8n-auth' "$COOKIE"
+}
+
 step "waiting for n8n"
-for i in $(seq 1 60); do
-  curl -sf "$N8N/rest/settings" >/dev/null 2>&1 && break
-  [ "$i" = 60 ] && { echo "n8n never became reachable at $N8N"; exit 1; }
+# /rest/settings starts answering before n8n can report setup state, so waiting on a
+# 200 is not waiting for readiness. Poll until the field itself is a real boolean.
+# Every step here tolerates failure explicitly. Under `set -e` an un-guarded curl in
+# a retry loop aborts the script on the first connection reset, so the loop can never
+# actually retry — which only shows up on a genuinely cold start.
+NEEDS_SETUP=""
+for i in $(seq 1 90); do
+  RAW="$(curl -s --max-time 5 "$N8N/rest/settings" 2>/dev/null || true)"
+  NEEDS_SETUP="$(printf '%s' "$RAW" | jget "JSON.parse(s).data.userManagement.showSetupOnFirstLoad" || true)"
+  { [ "$NEEDS_SETUP" = "true" ] || [ "$NEEDS_SETUP" = "false" ]; } && break
+  [ "$i" = 90 ] && { echo "n8n never reported readiness at $N8N"; exit 1; }
   sleep 2
 done
-say "reachable at $N8N"
+say "ready at $N8N"
 
 step "owner account"
-NEEDS_SETUP="$(curl -s "$N8N/rest/settings" | jget "JSON.parse(s).data.userManagement.showSetupOnFirstLoad")"
 if [ "$NEEDS_SETUP" = "true" ]; then
-  curl -s -X POST "$N8N/rest/owner/setup" -H 'content-type: application/json' \
-    -d "{\"email\":\"$N8N_OWNER_EMAIL\",\"firstName\":\"$N8N_OWNER_FIRST_NAME\",\"lastName\":\"$N8N_OWNER_LAST_NAME\",\"password\":\"$N8N_OWNER_PASSWORD\"}" \
-    -o /dev/null
+  setup_owner
   say "created $N8N_OWNER_EMAIL"
 else
   say "already configured"
 fi
 
 step "login"
-curl -s -c "$COOKIE" -X POST "$N8N/rest/login" -H 'content-type: application/json' \
-  -d "{\"emailOrLdapLoginId\":\"$N8N_OWNER_EMAIL\",\"password\":\"$N8N_OWNER_PASSWORD\"}" -o /dev/null
-grep -q 'n8n-auth' "$COOKIE" || { echo "login failed — check N8N_OWNER_* in .env"; exit 1; }
+if ! try_login; then
+  # Belt and braces: if the instance reported configured but will not accept the
+  # owner, attempt setup once before giving up. Beats a misleading credentials error.
+  say "login rejected — attempting owner setup once"
+  setup_owner
+  try_login || { echo "login failed — check N8N_OWNER_* in .env"; exit 1; }
+fi
 say "authenticated"
 
 step "credentials"

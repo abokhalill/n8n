@@ -85,7 +85,7 @@ CREATE TABLE lead (
   last_sales_action_at timestamptz,
   vip_flag            boolean NOT NULL DEFAULT false,
   approval_state      text NOT NULL DEFAULT 'not_required'
-                        CHECK (approval_state IN ('not_required','pending','approved','rejected','expired')),
+                        CHECK (approval_state IN ('not_required','pending','approved','rejected','expired','superseded')),
 
   dedup_status        text NOT NULL DEFAULT 'unique'
                         CHECK (dedup_status IN ('unique','master','merged_into','pending_review')),
@@ -214,7 +214,9 @@ CREATE TABLE approval_request (
   lead_id      text NOT NULL REFERENCES lead(lead_id),
   kind         text NOT NULL DEFAULT 'vip' CHECK (kind IN ('vip','duplicate_merge')),
   state        text NOT NULL DEFAULT 'pending'
-                 CHECK (state IN ('pending','approved','rejected','expired')),
+                 -- superseded: the gate became moot before anyone answered it, e.g. the
+                 -- lead booked a meeting. Distinct from expired, which means nobody acted.
+                 CHECK (state IN ('pending','approved','rejected','expired','superseded')),
   token        text NOT NULL UNIQUE,
   requested_at timestamptz NOT NULL DEFAULT now(),
   expires_at   timestamptz NOT NULL,

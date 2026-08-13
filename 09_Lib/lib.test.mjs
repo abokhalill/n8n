@@ -8,7 +8,7 @@ import { assess, jaroWinkler, tierFor, CIRCUMSTANTIAL_WEIGHTS } from './dedup.mj
 import { toCanonical, validate } from './validate.mjs';
 import { parseCsv } from './csv.mjs';
 import { route, assignRep } from './routing.mjs';
-import { SEQUENCES, nextStep, sequenceStopReason, scaleMinutes, slaBreached, approvalTimeoutAction } from './followup.mjs';
+import { SEQUENCES, nextStep, sequenceStopReason, scaleMinutes, slaBreached, approvalTimeoutAction, approvalMootReason } from './followup.mjs';
 import { ulid, canonicalJson, sha256 } from './ids.mjs';
 
 // ---------------------------------------------------------------- edge case 2
@@ -564,4 +564,17 @@ test('a lead that was never gated still measures from assignment', () => {
     { now: new Date('2026-08-12T10:31:00Z').getTime() });
   assert.equal(r.breached, true);
   assert.equal(r.measured_from, 'assignment');
+});
+
+// A booking arrives while a VIP approval is still pending. The gate becomes moot, not
+// lapsed — expiring it escalates to a manager about a lead that already converted.
+test('a pending approval is moot once the lead has converted or left', () => {
+  const gated = { status: 'routed', dedup_status: 'unique', consent_status: 'granted' };
+  assert.equal(approvalMootReason(gated), null, 'a live gated lead still needs a decision');
+
+  assert.match(approvalMootReason({ ...gated, status: 'meeting_booked' }), /already booked/);
+  assert.match(approvalMootReason({ ...gated, status: 'closed' }), /closed/);
+  assert.match(approvalMootReason({ ...gated, dedup_status: 'merged_into' }), /merged/);
+  assert.match(approvalMootReason({ ...gated, consent_status: 'withdrawn' }), /consent withdrawn/);
+  assert.match(approvalMootReason(null), /no longer exists/);
 });

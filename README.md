@@ -3,7 +3,8 @@
 A lead-processing system built for a technical assessment: n8n orchestration, Postgres
 for durable state, every external system mocked with deliberate fault injection.
 
-**All 14 mandatory edge cases pass, reproducibly, in one command.**
+**All 14 mandatory edge cases pass, reproducibly, in one command** — plus interaction
+regressions for seams the single-fault cases cannot reach.
 
 ---
 
@@ -55,7 +56,7 @@ applying **once**.
 ```bash
 node --test 09_Lib/lib.test.mjs            # 48 tests — pure logic
 node 07_Mock_Services/selftest.mjs         # 28 tests — the harness itself
-node 05_Test_Evidence/run-edge-cases.mjs   # 14 scenarios — end to end
+node 05_Test_Evidence/run-edge-cases.mjs   # 15 scenarios — end to end
 node scripts/build-workflows.mjs --check   # fails if a workflow carries stale library code
 ```
 

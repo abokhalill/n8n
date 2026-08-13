@@ -336,7 +336,7 @@ lands the window runs from whichever of assignment or approval came later.
 |---|---|---|
 | Unit | `node --test 09_Lib/lib.test.mjs` | 51 tests over the pure logic |
 | Harness | `node 07_Mock_Services/selftest.mjs` | 28 assertions that the mocks fail correctly |
-| End to end | `node 05_Test_Evidence/run-edge-cases.mjs` | **14 of 14 mandatory cases** |
+| End to end | `node 05_Test_Evidence/run-edge-cases.mjs` | **14 mandatory + interaction regressions, 15/15** |
 
 Code nodes cannot be tested in place, so logic lives in `09_Lib` and is injected by
 `scripts/build-workflows.mjs`, whose `--check` mode fails on a stale copy.
@@ -378,14 +378,16 @@ developer-generated ones.
 11. **Queue mode is off by default.** The SQL is written for concurrent workers; enabling
     it is a compose profile.
 12. **Email is a `channel` field** on the existing dispatcher, not a second integration.
-13. **The evidence harness tests one fault at a time**, inheriting the brief's framing. It
-    cannot find interactions between individually-correct subsystems — the VIP/SLA clock
-    bug was found by review, not by the suite.
+13. **Single-fault testing was the harness's blind spot.** Two bugs lived in seams
+    between individually-correct subsystems — the SLA clock running while the VIP gate
+    blocked the rep, and a booking failing to close a pending approval. Both were found
+    by review. Interaction regressions now run alongside the brief's fourteen; more
+    combinations remain untested.
 
 ### Next, in order
 
 1. Webhook signature verification per source.
-2. Combinatorial test scenarios (VIP × SLA, duplicate × booking, opt-out × retry).
+2. More combinatorial scenarios (duplicate × booking, opt-out × retry, merge × approval).
 3. Trigram blocking, then fit the dedup thresholds once labelled merges exist.
 4. libphonenumber-js via a small custom n8n image.
 5. Queue mode plus a second worker.

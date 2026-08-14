@@ -56,7 +56,7 @@ export function sequenceStopReason(lead, { booking = null } = {}) {
 // A pending approval can stop being meaningful without anyone answering it. The gate
 // exists to authorise automated sales outreach; once the lead has converted, opted out
 // or been superseded there is no outreach left to authorise, so the gate is moot rather
-// than lapsed. Expiring it instead escalates to a manager about a closed matter — and
+// than lapsed. Expiring it instead escalates to a manager about a closed matter, and
 // under a fail-open timeout policy would message a customer who already booked.
 export function approvalMootReason(lead) {
   if (!lead) return 'lead no longer exists';

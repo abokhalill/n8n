@@ -88,7 +88,7 @@ export function select(ctx) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Returns true when the fault has taken over the response, false to fall through
-// to the real handler (which is what 'slow' wants — it delays a success, not a failure).
+// to the real handler (which is what 'slow' wants, since it delays a success rather than causing a failure).
 export async function apply(fault, _req, res) {
   switch (fault.mode) {
     case 'drop_response': {
@@ -132,7 +132,7 @@ export async function apply(fault, _req, res) {
       return true;
 
     case 'respond':
-      // Not a failure — a forced *valid* response. Edge case 5 needs the AI to
+      // Not a failure at all, but a forced *valid* response. Edge case 5 needs the AI to
       // confidently disagree with the rules, which is behaviour, not breakage.
       res.set(fault.headers).status(fault.status === 500 ? 200 : fault.status)
         .json(fault.body ?? {});

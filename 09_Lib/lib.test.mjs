@@ -414,7 +414,7 @@ test('a qualified lead routes on its band with nothing held', () => {
 // -------------------------------------------------------------- edge cases 5, 12
 test('a material AI conflict overrides the band and routes to manual review', () => {
   const scored = { score: 22, band: 'unqualified', vip: false, model_version: 'v1' };
-  const conflict = { conflict: true, reason: 'AI says qualified at 0.91, rules say unqualified — 2 bands apart' };
+  const conflict = { conflict: true, reason: 'AI says qualified at 0.91, rules say unqualified, 2 bands apart' };
   const r = route({ lead: {}, scored, conflict, dedup: { tier: 'distinct' } });
   assert.equal(r.disposition, 'manual_review');
   assert.match(r.reason, /2 bands apart/);
@@ -567,7 +567,7 @@ test('a lead that was never gated still measures from assignment', () => {
 });
 
 // A booking arrives while a VIP approval is still pending. The gate becomes moot, not
-// lapsed — expiring it escalates to a manager about a lead that already converted.
+// lapsed. Expiring it escalates to a manager about a lead that already converted.
 test('a pending approval is moot once the lead has converted or left', () => {
   const gated = { status: 'routed', dedup_status: 'unique', consent_status: 'granted' };
   assert.equal(approvalMootReason(gated), null, 'a live gated lead still needs a decision');

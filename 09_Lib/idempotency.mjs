@@ -2,7 +2,7 @@ import { canonicalJson, sha256 } from './ids.mjs';
 
 // A key names an *effect*, not an attempt. Two tries at the same effect collide;
 // two different effects never do. Nothing that varies between retries may appear
-// here — no execution id, no timestamp, no attempt counter — because replay safety
+// here, so no execution id, no timestamp and no attempt counter, because replay safety
 // (edge case 14) is a consequence of that purity rather than a separate mechanism.
 
 export const KEY_VERSION = 'v1';
@@ -47,7 +47,7 @@ const TRANSPORT_ERRORS = /ECONNRESET|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|
 // and brief section I calls out missing credentials as its own case.
 export function classifyFailure({ status, code, message } = {}) {
   if (status === 401 || status === 403) {
-    return { retryable: false, reason: 'auth', detail: 'credentials rejected — retrying cannot help' };
+    return { retryable: false, reason: 'auth', detail: 'credentials rejected, so retrying cannot help' };
   }
   if (status && RETRYABLE_STATUS.has(status)) {
     return { retryable: true, reason: status === 429 ? 'rate_limited' : 'transient_server' };

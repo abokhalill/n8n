@@ -9,7 +9,7 @@ function identityLocal(email) {
 
 // Features are derived independently and weights are published, so a merge decision
 // can be re-argued from its stored vector rather than taken on trust. The thresholds
-// are priors, not fitted values — see the design note for why that is defensible.
+// are priors rather than fitted values, and the design note explains why that is still defensible.
 
 export const DEDUP_MODEL_VERSION = 'v1';
 

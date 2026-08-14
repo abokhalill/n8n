@@ -227,7 +227,7 @@ CREATE TABLE approval_request (
 
 CREATE INDEX approval_pending_idx ON approval_request (expires_at) WHERE state = 'pending';
 
--- Append-only. One row per *decision*, with the inputs that produced it — logging
+-- Append-only. One row per *decision*, with the inputs that produced it. Logging
 -- "routed to manual review" without its inputs makes the trail unreconstructible.
 CREATE TABLE event_log (
   id              bigserial PRIMARY KEY,

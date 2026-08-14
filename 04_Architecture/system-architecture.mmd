@@ -1,126 +1,105 @@
-%% System architecture — lead processing pipeline
-%% Solid arrows = data/control flow. Dashed = state reads/writes.
+%% System architecture. Read left to right: a lead enters at the far left and every
+%% external effect leaves at the far right. Solid arrows carry work, dotted arrows are
+%% reads and writes against Postgres. Every workflow shown reads and writes that store;
+%% only the queue edge is drawn, because drawing all of them obscures the flow.
 flowchart TB
 
-  subgraph EXT["External systems — all mocked (Phase 2)"]
-    direction LR
-    SWEB["Website form"]
-    SWA["WhatsApp inbound"]
-    SCSV["CSV / manual import"]
-    CAL["Booking provider"]
-    MGR["Manager approval callback"]
+  subgraph SRC["Sources, all mocked"]
+    direction TB
+    S1["Website form"]
+    S2["WhatsApp inbound"]
+    S3["CSV / manual import"]
+    S4["Calendar / booking provider"]
   end
 
-  subgraph PROV["Outbound providers — mocked, fault-injectable"]
-    direction LR
-    ENR["Enrichment API"]
-    LLM["LLM classifier"]
-    MSG["WhatsApp / email send"]
-    ODOO["Odoo CRM"]
-  end
-
-  subgraph INTAKE["Intake — ack fast, process never"]
-    direction LR
+  subgraph IN["Intake: acknowledge fast, process never"]
+    direction TB
     W01["wf-01 website"]
     W02["wf-02 whatsapp"]
     W03["wf-03 csv"]
   end
 
-  subgraph CORE["Processing"]
-    W10["wf-10 pipeline-core<br/>validate / dedup / enrich<br/>score / classify / route"]
-    W40["wf-40 booking-webhook"]
-    W41["wf-41 approval-callback"]
+  Q{{"work_queue<br/>durable, at-least-once<br/>leases expire and work is redelivered"}}
+
+  W10["wf-10 pipeline-core<br/>dedup · enrich · score<br/>classify · route · assign<br/><br/>no external writes"]
+
+  subgraph DISP["Side-effect choke points: one writer each"]
+    direction TB
+    W20["wf-20 outbound-dispatch<br/>the only sender<br/>claim · call · commit"]
+    W21["wf-21 odoo-sync<br/>the only CRM writer<br/>monotonic stage lattice"]
   end
 
-  subgraph CHOKE["Side-effect choke points — single writer each"]
-    W20["wf-20 outbound-dispatch<br/>claim / commit / reconcile"]
-    W21["wf-21 odoo-sync<br/>monotonic stage lattice"]
+  subgraph PROV["Providers, mocked and fault-injectable"]
+    direction TB
+    P1["Enrichment API"]
+    P2["LLM classifier"]
+    P3["WhatsApp / email"]
+    P4["Odoo CRM"]
   end
 
-  subgraph SCHED["Time"]
-    W30["wf-30 scheduler-tick<br/>cron 1m — lease + revalidate<br/>retries / follow-ups / SLA / expiry"]
+  W30["wf-30 scheduler-tick<br/>cron 1m<br/>follow-ups · SLA · expiry<br/><br/>re-reads state at dispatch"]
+
+  subgraph EV["Inbound events"]
+    direction TB
+    W40["wf-40 booking<br/>keyed on provider booking id"]
+    W41["wf-41 approval<br/>keyed on approval token"]
   end
 
-  subgraph RECOV["Recovery"]
-    W50["wf-50 error-handler<br/>Error Trigger"]
-    W51["wf-51 dlq-reprocess<br/>manual, key-safe replay"]
+  subgraph REC["Recovery"]
+    direction TB
+    W50["wf-50 error-handler"]
+    W51["wf-51 dlq-reprocess<br/>succeeded claims never re-fire"]
   end
 
-  subgraph DB["Postgres — leadops"]
-    direction LR
-    T_LEAD["lead"]
-    T_EVT["lead_source_event<br/>unique source_event_key"]
-    T_IDEM["idempotency_claim"]
-    T_WQ["work_queue"]
-    T_DLQ["dead_letter"]
-    T_DUP["duplicate_decision"]
-    T_REP["sales_rep"]
-    T_APR["approval_request"]
-    T_LOG["event_log — append only"]
-  end
+  DB[("Postgres<br/>lead · idempotency_claim · event_log<br/>duplicate_decision · approval_request · sales_rep<br/><br/>also holds work_queue and dead_letter,<br/>drawn separately above")]
 
-  subgraph HUMAN["Human checkpoints"]
-    direction LR
-    H1{{"VIP approval gate"}}
-    H2{{"Duplicate review"}}
-    H3{{"AI / rules conflict review"}}
-    H4{{"Data completion"}}
-    H5{{"DLQ operator replay"}}
-  end
+  CON["Operator console<br/>summary · timelines · approvals · replay"]
 
-  SWEB --> W01
-  SWA --> W02
-  SCSV --> W03
-  CAL --> W40
-  MGR --> W41
+  HUM{{"Human checkpoints<br/>VIP approval · duplicate review<br/>AI conflict · data completion · DLQ replay"}}
 
-  W01 --> T_EVT
-  W02 --> T_EVT
-  W03 --> T_EVT
-  T_EVT --> T_WQ
+  S1 --> W01
+  S2 --> W02
+  S3 --> W03
+  W01 --> Q
+  W02 --> Q
+  W03 --> Q
 
-  T_WQ --> W30
-  W30 --> W10
-  W30 --> W20
-  W30 --> W21
+  Q --> W10
+  W10 -- "enqueues effects" --> Q
+  Q --> W20
+  Q --> W21
+  Q --> W30
+  W30 -- "reschedules" --> Q
 
-  W10 -.-> T_LEAD
-  W10 -.-> T_DUP
-  W10 --> ENR
-  W10 --> LLM
-  W10 --> T_WQ
+  W10 --> P1
+  W10 --> P2
+  W20 --> P3
+  W21 --> P4
 
-  W10 --> H2
-  W10 --> H3
-  W10 --> H4
-  W10 --> H1
-  H1 -.-> T_APR
-  W41 -.-> T_APR
-  W41 --> W21
+  S4 --> W40
+  W40 --> Q
+  W41 --> Q
+  W10 -. "unhandled failure" .-> W50
+  W20 -. "unhandled failure" .-> W50
+  W50 --> DB
+  W51 --> Q
 
-  W40 -.-> T_IDEM
-  W40 --> W21
-  W40 --> W20
+  W01 -.-> DB
+  Q -.-> DB
+  DB -.-> CON
+  CON --> HUM
+  HUM --> W41
+  HUM --> W51
 
-  W20 -.-> T_IDEM
-  W20 --> MSG
-  W21 -.-> T_IDEM
-  W21 --> ODOO
+  classDef choke fill:#bfdbfe,stroke:#1d4ed8,color:#0c1a3d,stroke-width:2px
+  classDef human fill:#fde68a,stroke:#b45309,color:#1c1917,stroke-width:2px
+  classDef store fill:#e5e7eb,stroke:#4b5563,color:#111827,stroke-width:2px
+  classDef queue fill:#dcfce7,stroke:#15803d,color:#052e16,stroke-width:2px
+  classDef core fill:#ede9fe,stroke:#6d28d9,color:#1e1b4b,stroke-width:2px
 
-  W50 --> T_DLQ
-  T_DLQ --> H5
-  H5 --> W51
-  W51 --> T_WQ
-
-  W10 -.-> T_LOG
-  W20 -.-> T_LOG
-  W21 -.-> T_LOG
-  W30 -.-> T_LOG
-  W30 -.-> T_REP
-
-  classDef human fill:#fde68a,stroke:#b45309,color:#1c1917
-  classDef choke fill:#bfdbfe,stroke:#1d4ed8,color:#0c1a3d
-  classDef store fill:#e5e7eb,stroke:#4b5563,color:#111827
-  class H1,H2,H3,H4,H5 human
   class W20,W21 choke
-  class T_LEAD,T_EVT,T_IDEM,T_WQ,T_DLQ,T_DUP,T_REP,T_APR,T_LOG store
+  class HUM human
+  class DB store
+  class Q queue
+  class W10,W30 core
+  class CON store

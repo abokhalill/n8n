@@ -33,7 +33,7 @@ export function rankOf(stage) {
   return STAGE_RANK[stage] ?? null;
 }
 
-// Returns what the writer should do, and why, rather than a bare boolean — the
+// Returns what the writer should do, and why, rather than a bare boolean, because the
 // reason ends up in the audit trail.
 export function planStageTransition({ current, target, rollbackReason = null }) {
   if (!target) return { action: 'skip', reason: 'no stage implied by this disposition' };

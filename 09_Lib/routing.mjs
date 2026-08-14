@@ -90,7 +90,7 @@ export function assignRep({ lead, reps, overloadThreshold = 1 }) {
   if (!eligible.length) {
     const anyAvailable = (reps ?? []).filter((r) => r.available);
     if (!anyAvailable.length) {
-      return { rep_id: null, reason: 'no available rep — escalating to manager', fallback_level: 'none', escalate: true };
+      return { rep_id: null, reason: 'no available rep, escalating to manager', fallback_level: 'none', escalate: true };
     }
     // Everyone is at or over capacity: give it to the least-loaded rather than
     // dropping it, and flag that the team is saturated.

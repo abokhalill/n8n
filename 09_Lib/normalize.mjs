@@ -1,4 +1,4 @@
-// Normalisation is lossy, so nothing here mutates the original value — callers keep
+// Normalisation is lossy, so nothing here mutates the original value. Callers keep
 // the raw field alongside the normalised one. Edge case 2 (same number, two formats)
 // is solved by comparing normalised values; auditing it needs the raw ones.
 
@@ -82,7 +82,7 @@ export function normalizeEmail(raw) {
 }
 
 // Gmail-style dot and +tag stripping is a *dedup feature only*. It must never
-// replace the address we actually send to — some providers treat those as distinct.
+// replace the address we actually send to, because some providers treat those as distinct.
 const DOT_INSENSITIVE = new Set(['gmail.com', 'googlemail.com']);
 
 export function emailDedupKey(email) {

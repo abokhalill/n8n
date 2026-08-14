@@ -11,7 +11,7 @@ export const router = Router();
 
 // Same reconciliation contract as Odoo. Real WhatsApp BSPs vary: some accept a
 // client message id, some don't. Where they don't, the honest fallback is
-// at-most-once — a missing message beats a duplicate one.
+// at-most-once, because a missing message beats a duplicate one.
 router.get('/messages/lookup', (req, res) => {
   // Labelled explicitly: a reconciliation read is not a delivery. The journal is
   // used as a test oracle for exactly-once, so counting a lookup as a send would

@@ -74,7 +74,7 @@
     },
     {
       "parameters": {
-        "content": "## Safe manual replay\n**Edge case 14.** One rule makes it safe:\n\nA claim that **succeeded** is never touched — an effect that already happened cannot happen twice. A claim that **failed permanently** is cleared, because that effect provably did not happen and an operator replaying it is an explicit decision to retry.\n\nRequeued work carries its original key, so anything already committed short-circuits. Rows that are not replayable work — a corrupt CSV row, an unhandled crash — stay open for a human.",
+        "content": "## Safe manual replay\n**Edge case 14.** One rule makes it safe:\n\nA claim that **succeeded** is never touched, so an effect that already happened cannot happen twice. A claim that **failed permanently** is cleared, because that effect provably did not happen and an operator replaying it is an explicit decision to try again.\n\nRequeued work carries its original key, so anything already committed short-circuits on its own. Rows that aren't replayable work, like a corrupt CSV row or an unhandled crash, stay open for a human.",
         "height": 257,
         "width": 820,
         "color": 5

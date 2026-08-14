@@ -1,62 +1,64 @@
-# LeadOps — multi-source lead pipeline
+# LeadOps: a multi-source lead pipeline
 
-A lead-processing system built for a technical assessment: n8n orchestration, Postgres
-for durable state, every external system mocked with deliberate fault injection.
+A lead processing system built for a technical assessment. n8n does the orchestration,
+Postgres holds the state that has to survive a crash, and every external system is
+mocked with fault injection you can aim.
 
-**All 14 mandatory edge cases pass, reproducibly, in one command** — plus interaction
-regressions for seams the single-fault cases cannot reach.
+All 14 mandatory edge cases pass, reproducibly, in one command. So do the interaction
+regressions covering seams the single-fault cases can't reach.
 
 ---
 
 ## Run it
 
-Requires Docker and Node 20+.
+You need Docker and Node 20 or newer.
 
 ```bash
-cp .env.example .env          # placeholders only 
+cp .env.example .env          # placeholders only, no real credential anywhere
 docker compose up -d --build
-./scripts/bootstrap.sh        # owner account, credentials, workflow import + activation
+./scripts/bootstrap.sh        # owner account, credentials, workflow import, activation
 ```
 
-Bootstrap is idempotent; re-running it is safe. There are no manual setup steps —
-n8n's owner account, the Postgres credential and all eleven workflows are created and
-activated by script.
+Bootstrap is safe to re-run. There are no manual setup steps: the n8n owner account, the
+Postgres credential, and all eleven workflows are created and activated by script.
 
 | Service | Where |
 |---|---|
-| **Operator console** | **`http://localhost:8090`** — start here |
-| n8n editor | `http://localhost:5678` (credentials in `.env`) |
-| Mock providers + control plane | `http://localhost:8080` |
+| **Operator console** | **`http://localhost:8090`**, start here |
+| n8n editor | `http://localhost:5678`, credentials in `.env` |
+| Mock providers and control plane | `http://localhost:8080` |
 | Database | `psql -h localhost -U leadops -d leadops` |
 
 ## See it work
 
-Open **`http://localhost:8090`**. The console is the fastest way in: summary tiles,
-every lead with its score breakdown and timeline, the provider call journal, and the
-three human checkpoints as actual buttons — approve or reject a VIP, work the manual
-review queue, replay a dead letter. Every button drives the real workflow, so clicking
-Reject twice is suppressed as a duplicate exactly as a provider redelivering would be.
+Open **`http://localhost:8090`**.
+
+The console is the fastest way in. You get summary tiles, every lead with its score
+breakdown and full timeline, the provider call journal, and the three human checkpoints
+as actual buttons: approve or reject a VIP, work the manual review queue, replay a dead
+letter. Every button drives the real workflow, so clicking Reject twice gets suppressed
+as a duplicate exactly as a provider redelivering would.
 
 The `run now` buttons trigger each queue consumer on demand. They run on a one-minute
-schedule anyway; the buttons just avoid waiting while someone is watching.
+schedule anyway; the buttons just save you waiting while someone is watching.
 
 ```bash
-./scripts/demo.sh                          # narrated walkthrough of one lead
-node 05_Test_Evidence/run-edge-cases.mjs   # all 14 edge cases, pass/fail
-node scripts/ops-report.mjs                # operational summary + a lead's full timeline
+./scripts/demo.sh                          # narrated walkthrough of a single lead
+node 05_Test_Evidence/run-edge-cases.mjs   # every edge case, pass or fail
+node scripts/ops-report.mjs                # operational summary and one lead's timeline
 ```
 
-The demo takes a lead from intake through scoring, routing, CRM sync and a booking,
-then shows the two behaviours that are hard to believe without seeing: a cross-source
-duplicate producing **no second message**, and a booking webhook delivered twice
-applying **once**.
+The demo takes a lead from intake through scoring, routing, CRM sync and a booking. Then
+it shows the two behaviours that are hard to believe without watching: a cross-source
+duplicate that produces **no second message**, and a booking webhook delivered twice that
+applies **once**.
 
 ## Tests
 
 ```bash
-node --test 09_Lib/lib.test.mjs            # 48 tests — pure logic
-node 07_Mock_Services/selftest.mjs         # 28 tests — the harness itself
-node 05_Test_Evidence/run-edge-cases.mjs   # 15 scenarios — end to end
+node --test 09_Lib/lib.test.mjs            # 52 tests over the pure logic
+node 07_Mock_Services/selftest.mjs         # 28 tests that the mocks fail correctly
+node 05_Test_Evidence/run-edge-cases.mjs   # 15 scenarios, end to end
 node scripts/build-workflows.mjs --check   # fails if a workflow carries stale library code
 ```
 
@@ -64,59 +66,63 @@ node scripts/build-workflows.mjs --check   # fails if a workflow carries stale l
 
 ## How it holds together
 
-**The work queue is at-least-once by design.** Leases expire and work is redelivered.
-Correctness comes from the idempotency layer beneath it, not from the transport.
+Four ideas carry most of the weight. Everything else follows from them.
 
-**An idempotency key names an *effect*, not an *attempt*:**
+**The queue is at-least-once on purpose.** Leases expire and work gets redelivered. That
+isn't a flaw we tolerate, it's the design. Correctness lives in the idempotency layer
+underneath, not in the transport.
+
+**An idempotency key names an *effect*, not an *attempt*.**
 
 ```
 v1:{domain}:{entity}:{id}:{occurrence}
 ```
 
-Derived only from stable inputs — never an execution id, a timestamp, or an attempt
-counter. Two tries at the same effect collide; two different effects never do.
-Replaying a workflow is safe as a *consequence* of that, not as a separate feature.
+Keys come only from stable inputs. Never an execution id, never a timestamp, never an
+attempt counter. Two tries at the same effect collide; two different effects never do.
+Replaying a workflow is therefore safe as a *consequence* of that.
 
-**Outbound effects use claim → call → commit.** When a provider answers, the effect
-definitively did not happen and retrying is safe. When there is only silence — timeout,
-socket reset, a crash between calling and recording — the outcome is ambiguous, so the
-provider is asked by key rather than guessed at. Guessing either double-sends or drops.
+**Outbound effects use claim, call, commit.** If a provider answers, the effect
+definitively did not happen and retrying is safe. If there's only silence, whether a
+timeout, a socket reset, or a crash between calling and recording, the outcome is
+genuinely ambiguous. So we ask the provider by key instead of guessing. Guessing
+double-sends or drops, and both are bad in different ways.
 
-**Scheduled work re-reads the world at dispatch.** A follow-up queued an hour ago is
-judged against consent, ownership and booking state as they are *now*. This is why
-follow-ups live in a table rather than in an n8n `Wait` node — a waiting execution
-cannot be cancelled or signalled from outside.
+**Scheduled work re-reads the world when it fires.** A follow-up queued an hour ago gets
+judged against consent, ownership and booking state as they are *now*. That's why
+follow-ups live in a table rather than an n8n `Wait` node: a waiting execution can't be
+cancelled or signalled from outside.
 
-**Two workflows may touch a third party**: one sends messages, one writes to the CRM.
-Enforcement in one place each is the point — a protocol implemented in five workflows
-is enforced in none.
+One more thing worth knowing. Exactly two workflows may touch a third party: one sends
+messages, one writes to the CRM. Single enforcement points are the point, because a
+protocol implemented in five places is enforced in none.
 
-Full reasoning in [`03_Technical_Design/02-srs.md`](03_Technical_Design/02-srs.md).
+The full reasoning lives in [`03_Technical_Design/technical-design.md`](03_Technical_Design/technical-design.md).
 
 ---
 
 ## Layout
 
-| Path | What |
+| Path | What's in it |
 |---|---|
-| `02_Workflows/` | Eleven n8n workflow exports, importable as-is |
-| `03_Technical_Design/` | Architecture note (pre-build) and SRS (post-build) |
-| `04_Architecture/` | System and idempotency-lifecycle diagrams |
-| `05_Test_Evidence/` | Edge-case harness, results transcript, ops summary example |
+| `02_Workflows/` | Eleven n8n workflow exports, importable as they are |
+| `03_Technical_Design/` | Architecture note written before the build, SRS written after |
+| `04_Architecture/` | System and idempotency lifecycle diagrams |
+| `05_Test_Evidence/` | Edge case harness, results transcript, screenshots |
 | `06_Sample_Data/` | Payloads for driving the system by hand |
-| `07_Mock_Services/` | Odoo, WhatsApp, enrichment, LLM, booking + fault control plane |
+| `07_Mock_Services/` | Odoo, WhatsApp, enrichment, LLM, booking, plus the fault control plane |
 | `08_Database/` | Schema, views, fixtures |
 | `09_Lib/` | Pure logic, unit tested, injected into Code nodes by the build script |
-| `10_Operator_Console/` | Operator UI — summary, lead timelines, approvals, DLQ replay |
-| `scripts/` | Bootstrap, demo, ops report, workflow build and canvas annotation |
+| `10_Operator_Console/` | Operator UI: summary, lead timelines, approvals, DLQ replay |
+| `scripts/` | Bootstrap, demo, ops report, workflow build, canvas annotation |
 
-Each n8n canvas carries sticky notes explaining what it does and which edge case
-forced it — the reasoning otherwise lives inside Code nodes and SQL that nobody opens.
-Regenerate them with `node scripts/annotate-workflows.mjs`.
+Every n8n canvas carries sticky notes explaining what it does and which edge case forced
+it. Without them a canvas is five boxes in a line and the reasoning stays hidden inside
+Code nodes nobody opens. Regenerate them with `node scripts/annotate-workflows.mjs`.
 
 ### The workflows
 
-| Workflow | Responsibility |
+| Workflow | What it's responsible for |
 |---|---|
 | `wf-01/02/03-intake-*` | Website, WhatsApp, CSV. Normalise, key, enqueue, acknowledge |
 | `wf-10-pipeline-core` | Dedup, enrichment, scoring, AI classification, routing, assignment |
@@ -124,74 +130,79 @@ Regenerate them with `node scripts/annotate-workflows.mjs`.
 | `wf-21-odoo-sync` | The only workflow that writes to the CRM |
 | `wf-30-scheduler-tick` | Follow-ups, SLA checks, approval expiry |
 | `wf-40/41` | Booking webhook, VIP approval callback |
-| `wf-50/51` | Error handler, safe DLQ replay |
+| `wf-50/51` | Error handler, safe dead-letter replay |
 
 ---
 
 ## Configuration
 
-Everything tunable lives in `.env` — thresholds and endpoints are passed to workflows
-as `$env.*`, so nothing is baked into an exported workflow. Swapping a mock for a real
-provider is a one-line base-URL change.
+Everything tunable lives in `.env`. Thresholds and endpoints reach workflows as `$env.*`,
+so nothing is baked into an exported workflow and swapping a mock for a real provider is
+a one-line base URL change.
 
-| Variable | Default | Effect |
+| Variable | Default | What it does |
 |---|---|---|
 | `DEDUP_AUTO_MERGE_THRESHOLD` | `0.90` | Above this, duplicates merge automatically |
 | `DEDUP_REVIEW_THRESHOLD` | `0.65` | Between the two, a human decides |
 | `SCORE_QUALIFIED_MIN` / `SCORE_VIP_MIN` | `70` / `90` | Band boundaries |
 | `SLA_MINUTES` | `30` | Qualified lead with no sales action |
-| `VIP_APPROVAL_ON_TIMEOUT` | `escalate` | `escalate` \| `send` \| `hold` — see below |
+| `VIP_APPROVAL_ON_TIMEOUT` | `escalate` | `escalate`, `send`, or `hold`. See below |
 | `FOLLOWUP_TIME_SCALE` | `1` | Compresses follow-up intervals for demos |
-| `RETRY_BASE_MS` / `RETRY_CAP_MS` | `2000` / `900000` | Full-jitter backoff bounds — see note |
+| `RETRY_BASE_MS` / `RETRY_CAP_MS` | `2000` / `900000` | Full-jitter backoff bounds. See below |
 | `RETRY_MAX_ATTEMPTS` | `5` | Attempts before an effect is dead-lettered |
 
-**`VIP_APPROVAL_ON_TIMEOUT` is a business decision, not an engineering one.** If a
+**`VIP_APPROVAL_ON_TIMEOUT` is a business decision, not an engineering one.** When a
 manager never answers a VIP approval, sending anyway risks an unapproved message to a
-strategic account; holding risks silence on the highest-value lead in the funnel. The
-default fails closed and escalates to a second approver. An unrecognised value also
-fails closed.
+strategic account, and holding risks silence on the highest-value lead in the funnel.
+There's no correct answer here, only a risk appetite. The default fails closed and
+escalates to a second approver. An unrecognised value also fails closed.
 
-**`RETRY_CAP_MS` is not reachable at the default attempt count.** Backoff is
-`random(0, min(2000 × 2^attempt, cap))`, so five attempts top out around 64 seconds
-and the 15-minute cap never binds. It is a ceiling for higher `RETRY_MAX_ATTEMPTS`,
-not a value the default configuration ever reaches. Left in place deliberately so
-raising the attempt count stays bounded.
+**`RETRY_CAP_MS` never binds at the default attempt count.** Backoff is
+`random(0, min(2000 × 2^attempt, cap))`, so five attempts top out around 64 seconds and
+the 15-minute cap is never reached. It's a ceiling for higher `RETRY_MAX_ATTEMPTS`, kept
+deliberately so that raising the attempt count stays bounded.
 
-**`FOLLOWUP_TIME_SCALE`** exists because the real cadence is 1h/24h/72h for qualified
-leads and 3d/10d/30d for nurture, which nobody sits through in a walkthrough. `0.002`
-turns the first touch into about seven seconds. The sequence is unchanged, only the
-clock.
+**`FOLLOWUP_TIME_SCALE` exists because nobody sits through the real cadence.** Qualified
+leads get chased at 1 hour, 24 hours and 72 hours; nurture leads at 3, 10 and 30 days.
+Setting this to `0.002` turns the first touch into about seven seconds. The sequence
+being demonstrated doesn't change, only the clock.
 
 ---
 
 ## Secrets
 
-No real credential appears in this repository. `.env.example` carries placeholders;
-`.env` is git-ignored and was never committed. The n8n Postgres credential is assembled
-from `.env` at bootstrap into a temporary file, imported, then deleted from both host
-and container — and stored encrypted at rest under `N8N_ENCRYPTION_KEY`.
+No real credential appears anywhere in this repository. `.env.example` holds
+placeholders, `.env` is git-ignored, and it was never committed.
 
-The one value that must be unguessable — the VIP approval callback token — is generated
-by Postgres `gen_random_uuid()` rather than in a workflow, because the n8n Code node
-sandbox has no CSPRNG.
+The n8n Postgres credential gets assembled from `.env` at bootstrap into a temporary
+file, imported, then deleted from both the host and the container. It's stored encrypted
+at rest under `N8N_ENCRYPTION_KEY`, which I verified by reading the ciphertext out of the
+database rather than assuming.
+
+One value has to be genuinely unguessable: the VIP approval callback token, because it
+travels in a URL. Postgres generates it with `gen_random_uuid()` rather than a workflow,
+because the n8n Code node sandbox has no cryptographic random source.
 
 ---
 
 ## What was deliberately cut
 
-- **Operational summary is a SQL view plus a reporting script, not a dashboard.** It
-  answers every question the brief asks; a dashboard is presentation work.
-- **Email is a `channel` field on the existing dispatcher**, not a second integration.
-  The claim/commit and hold logic are channel-agnostic.
-- **Dedup candidate blocking is exact-match** on phone, email, name or company. A
-  typo'd name with no other matching field is missed. Production wants trigram
-  blocking; the scoring that follows is unchanged.
-- **Phone normalisation covers six dial plans** with a hand-rolled parser rather than
-  libphonenumber-js, which the Code node sandbox cannot load without a custom image.
-- **Queue mode is off by default.** The SQL is written for concurrent workers; enabling
-  it is a compose profile, not a redesign.
+Named here rather than left for a reviewer to discover. The full reasoning and the
+remaining limitations are in the SRS.
 
-The largest mock-to-production divergence: **real Odoo has no idempotency-key header.**
-The mock implements one, so the demo is cleaner than production would be. The
-production design is the same shape — client-side claim plus a reconciliation search on
-an indexed custom field — only the reconciliation read is more expensive.
+- **The operational summary is a SQL view and a reporting script, not a dashboard.** It
+  answers every question the brief asks. A dashboard would be presentation work.
+- **Email is a `channel` field on the existing dispatcher**, not a second integration.
+  The claim/commit and hold logic don't care which channel they're driving.
+- **Dedup candidate blocking is exact-match** on phone, email, name or company. A typo'd
+  name with nothing else matching gets missed. Production wants trigram blocking, and the
+  scoring that follows would be unchanged.
+- **Phone normalisation covers six dial plans** with a hand-rolled parser instead of
+  libphonenumber-js, which the Code node sandbox can't load without a custom image.
+- **Queue mode is off by default.** The SQL is written for concurrent workers already,
+  so turning it on is a compose profile rather than a redesign.
+
+The largest gap between the mock and reality: **real Odoo has no idempotency-key
+header.** Our mock implements one, which makes the demo cleaner than production would
+be. The production design keeps the same shape, a client-side claim plus a reconciliation
+search on an indexed custom field, and only the reconciliation read gets more expensive.

@@ -1,7 +1,7 @@
 import { normalizeCompany, normalizeEmail, normalizeName, normalizePhone } from './normalize.mjs';
 
 // Validation sorts leads into "usable now" and "needs a human or a follow-up
-// question". It never drops one silently — brief section B is explicit that
+// question". It never drops one silently, because brief section B is explicit that
 // incomplete data goes down a Data Completion path rather than into a void.
 
 const SOURCE_FIELD_MAP = {
@@ -71,7 +71,7 @@ export function toCanonical({ source, payload, defaultRegion = 'AE', receivedAt 
   else if (CONSENT_FALSE.has(rawConsent)) consent_status = 'denied';
 
   // WhatsApp inbound is an inbound contact from the customer, which is consent to
-  // reply on that channel — but not consent to market. Recorded as such rather
+  // reply on that channel, but not consent to market. Recorded as such rather
   // than assumed either way.
   if (consent_status === 'unknown' && source === 'whatsapp') consent_status = 'granted';
 

@@ -1,4 +1,4 @@
-// Deterministic only. The AI classification never feeds this — a score that depends
+// Deterministic only. The AI classification never feeds this, because a score that depends
 // on a non-deterministic model cannot be reproduced, explained after the fact, or
 // regression tested. Disagreement between the two is handled as a routing signal.
 
@@ -13,11 +13,11 @@ const SERVED_REGIONS = new Set(['EMEA', 'MEA', 'APAC', 'AMER']);
 
 function headcountPoints(size) {
   if (!Number.isFinite(size)) return [0, 'no headcount data'];
-  if (size >= 1000) return [20, `${size} staff — enterprise`];
-  if (size >= 250) return [15, `${size} staff — upper mid-market`];
-  if (size >= 50) return [10, `${size} staff — mid-market`];
-  if (size >= 10) return [5, `${size} staff — small business`];
-  return [0, `${size} staff — micro business`];
+  if (size >= 1000) return [20, `${size} staff, enterprise`];
+  if (size >= 250) return [15, `${size} staff, upper mid-market`];
+  if (size >= 50) return [10, `${size} staff, mid-market`];
+  if (size >= 10) return [5, `${size} staff, small business`];
+  return [0, `${size} staff, micro business`];
 }
 
 export function scoreLead(lead) {
@@ -95,7 +95,7 @@ const BAND_ORDER = ['unqualified', 'nurture', 'qualified'];
 const AI_TO_BAND = { spam: 'unqualified', low_intent: 'unqualified', moderate: 'nurture', high_potential: 'qualified' };
 
 // "Materially conflict" is undefined in the brief, so it is defined here: more than
-// one band apart, and the model was confident. Adjacent disagreement is noise —
+// one band apart, and the model was confident. Adjacent disagreement is noise, and
 // treating it as conflict would send most of the funnel to manual review.
 export const CONFLICT_PREDICATE_VERSION = 'v1';
 
@@ -117,8 +117,8 @@ export function detectConflict({ band, ai }) {
     rule_band: band,
     confidence: ai.confidence ?? null,
     reason: conflict
-      ? `AI says ${aiBand} at ${ai.confidence}, rules say ${band} — ${distance} bands apart`
-      : `distance ${distance}, confidence ${ai.confidence ?? 'n/a'} — within tolerance`,
+      ? `AI says ${aiBand} at ${ai.confidence}, rules say ${band}, ${distance} bands apart`
+      : `distance ${distance}, confidence ${ai.confidence ?? 'n/a'}, within tolerance`,
     predicate_version: CONFLICT_PREDICATE_VERSION,
   };
 }

@@ -24,7 +24,7 @@ export const router = Router();
 
 // Reconciliation endpoint. This is the one thing the whole recovery story depends on:
 // after a lost ack we need to ask "did effect K land?" rather than guess. Real Odoo
-// has no equivalent — see the known-limitations section.
+// has no equivalent, which the known-limitations section covers.
 router.get('/leads/lookup', (req, res) => {
   // A reconciliation read is not a write. See the note in whatsapp.js.
   res.locals.journal.outcome = 'lookup';

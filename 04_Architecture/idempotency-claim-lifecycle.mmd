@@ -1,57 +1,72 @@
-%% Outbound effect lifecycle — the claim/commit/reconcile protocol.
-%% This is the mechanism behind edge cases 7, 8, 11 and 14.
+%% How one outbound effect is claimed, performed and settled. This is the mechanism
+%% behind edge cases 7, 8, 11 and 14, and it mirrors what wf-20 and wf-21 actually do.
+%% Guards out of Observed are evaluated in the order written, top to bottom.
 stateDiagram-v2
     direction TB
 
     [*] --> Deriving
 
-    Deriving: Derive key from stable inputs only
+    Deriving: Derive the key once, then persist it on the queue row
     note right of Deriving
       v1:{domain}:{entity}:{id}:{occurrence}
-      Never $execution.id, never a timestamp,
-      never an attempt counter. Purity here is
-      what makes replay (case 14) free.
+      Never an execution id, never a timestamp,
+      never an attempt counter. Retries read the key
+      back off the queue row rather than recomputing
+      it, so drifting inputs cannot mint a new key.
     end note
 
     Deriving --> Claiming
 
-    Claiming: INSERT ON CONFLICT DO NOTHING RETURNING
-    Claiming --> Owned: row returned — we own the effect
-    Claiming --> Observed: zero rows — someone got here first
+    Claiming: One statement, leasing the work and reading any existing claim
+    note left of Claiming
+      INSERT ... ON CONFLICT DO NOTHING RETURNING,
+      alongside a SELECT of the existing row. The
+      insert says whether we won; the select is how
+      the Observed guards below have state to read.
+    end note
+
+    Claiming --> Owned: the insert returned a row, we own this effect
+    Claiming --> Observed: zero rows, an earlier attempt already opened it
 
     Owned --> Calling
-    Calling: external provider call
 
-    Calling --> Succeeded: 2xx
-    Calling --> Retryable: 429 / 408 / 5xx / timeout
-    Calling --> Terminal: other 4xx / missing credentials
-    Calling --> Ambiguous: process died before settling
+    Calling: call the provider
+    Calling --> Settle: 2xx, record success and the provider reference
+    Calling --> Backoff: 429, 408 or 5xx
+    Calling --> Terminal: any other 4xx, or missing credentials
+    Calling --> Ambiguous: timeout, socket reset, or a crash before settling
 
-    Retryable --> Backoff
-    Backoff: requeue at random(0, min(2s*2^n, 15m))
-    Backoff --> Claiming: attempt < 5
+    Observed --> Settle: recorded succeeded, reuse the stored response
+    Observed --> Terminal: recorded failed_permanent
+    Observed --> Deferring: still presumed in flight, another worker may be mid-call
+    Observed --> Calling: last attempt was refused, or reconciliation proved absence
+    Observed --> Ambiguous: last attempt left no answer and no verdict
+
+    Deferring: requeue shortly, do not touch the provider
+    Deferring --> Claiming
+
+    Ambiguous: Did the effect land? This is case 7
+    Ambiguous --> Reconciling
+    Reconciling: ask the provider, looking the effect up by key
+    Reconciling --> Settle: found it, adopt the provider reference
+    Reconciling --> Backoff: not found, and the verdict is recorded on the claim
+
+    Backoff: requeue at random(0, min(2s x 2^n, 15m))
+    Backoff --> Claiming: attempts remain
     Backoff --> Terminal: attempts exhausted
 
-    Observed --> Succeeded: stored state = succeeded, reuse response
-    Observed --> Terminal: stored state = failed_permanent
-    Observed --> Backoff: in_flight and fresh — another worker owns it
-    Observed --> Ambiguous: in_flight and stale
-
-    Ambiguous: Did the effect land? Lost ack — case 7
-    Ambiguous --> Reconciling
-    Reconciling: ask the provider — lookup by idempotency key
-    Reconciling --> Succeeded: found, adopt provider_ref
-    Reconciling --> Backoff: not found, safe to retry
+    Settle: write claim state, provider reference and the audit row together
+    Settle --> Succeeded
 
     Terminal --> DeadLetter
-    DeadLetter: dead_letter row keeps the original key
-    DeadLetter --> Claiming: operator replay re-derives the SAME key
+    DeadLetter: dead_letter row, keeping the original key
+    DeadLetter --> Claiming: operator replay, which clears only failed claims
 
     Succeeded --> [*]
 
     note left of Succeeded
-      Idempotent by construction: every later
-      attempt lands in Observed and short-circuits.
-      Case 8 (WhatsApp retry) proven externally by
-      asserting the mock journal saw exactly one send.
+      Idempotent by construction: every later attempt
+      lands in Observed and short-circuits there.
+      Case 8 is proven from outside, by asserting the
+      provider journal recorded exactly one delivery.
     end note

@@ -1,6 +1,6 @@
 // Every inbound call, recorded. This is the test oracle: edge case 8 is proven by
 // asserting the WhatsApp provider saw exactly one *delivery* across two workflow
-// attempts — an outside observation, rather than the pipeline grading its own work.
+// attempts. That is an outside observation, rather than the pipeline grading its own work.
 
 const CAP = 5000;
 const entries = [];

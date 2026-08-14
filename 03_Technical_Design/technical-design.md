@@ -1,9 +1,5 @@
 # Technical Design
 
-Written after the build, describing the system that exists rather than the one that was
-planned. If you want to see how the design shifted along the way, the pre-build note is
-in git history at commit `c5421d7`, which predates the first workflow.
-
 ---
 
 ## 1. Assumptions

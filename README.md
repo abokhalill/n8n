@@ -1,11 +1,6 @@
 # LeadOps: a multi-source lead pipeline
 
-A lead processing system built for a technical assessment. n8n does the orchestration,
-Postgres holds the state that has to survive a crash, and every external system is
-mocked with fault injection you can aim.
-
-All 14 mandatory edge cases pass, reproducibly, in one command. So do the interaction
-regressions covering seams the single-fault cases can't reach.
+All 14 mandatory edge cases pass, reproducibly, in one command.
 
 ---
 
@@ -184,25 +179,3 @@ travels in a URL. Postgres generates it with `gen_random_uuid()` rather than a w
 because the n8n Code node sandbox has no cryptographic random source.
 
 ---
-
-## What was deliberately cut
-
-Named here rather than left for a reviewer to discover. The full reasoning and the
-remaining limitations are in the SRS.
-
-- **The operational summary is a SQL view and a reporting script, not a dashboard.** It
-  answers every question the brief asks. A dashboard would be presentation work.
-- **Email is a `channel` field on the existing dispatcher**, not a second integration.
-  The claim/commit and hold logic don't care which channel they're driving.
-- **Dedup candidate blocking is exact-match** on phone, email, name or company. A typo'd
-  name with nothing else matching gets missed. Production wants trigram blocking, and the
-  scoring that follows would be unchanged.
-- **Phone normalisation covers six dial plans** with a hand-rolled parser instead of
-  libphonenumber-js, which the Code node sandbox can't load without a custom image.
-- **Queue mode is off by default.** The SQL is written for concurrent workers already,
-  so turning it on is a compose profile rather than a redesign.
-
-The largest gap between the mock and reality: **real Odoo has no idempotency-key
-header.** Our mock implements one, which makes the demo cleaner than production would
-be. The production design keeps the same shape, a client-side claim plus a reconciliation
-search on an indexed custom field, and only the reconciliation read gets more expensive.

@@ -1,6 +1,7 @@
 # LeadOps: a multi-source lead pipeline
 
-All 14 mandatory edge cases pass, reproducibly, in one command.
+All 14 mandatory edge cases pass, plus 2 interaction cases we added after finding real
+bugs in the seams between them. Reproducibly, in one command.
 
 ---
 
@@ -53,7 +54,7 @@ applies **once**.
 ```bash
 node --test 09_Lib/lib.test.mjs            # 52 tests over the pure logic
 node 07_Mock_Services/selftest.mjs         # 28 tests that the mocks fail correctly
-node 05_Test_Evidence/run-edge-cases.mjs   # 15 scenarios, end to end
+node 05_Test_Evidence/run-edge-cases.mjs   # 16 scenarios, end to end
 node scripts/build-workflows.mjs --check   # fails if a workflow carries stale library code
 ```
 
@@ -101,7 +102,7 @@ The full reasoning lives in [`03_Technical_Design/technical-design.md`](03_Techn
 | Path | What's in it |
 |---|---|
 | `02_Workflows/` | Eleven n8n workflow exports, importable as they are |
-| `03_Technical_Design/` | Architecture note written before the build, SRS written after |
+| `03_Technical_Design/` | The SRS: assumptions, schema, integrations, idempotency, limitations |
 | `04_Architecture/` | System and idempotency lifecycle diagrams |
 | `05_Test_Evidence/` | Edge case harness, results transcript, screenshots |
 | `06_Sample_Data/` | Payloads for driving the system by hand |
